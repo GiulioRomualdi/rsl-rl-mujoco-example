@@ -32,7 +32,7 @@ class PPO:
         discriminator: Discriminator,
         amp_data: None,
         amp_normalizer: Optional[Any],
-        amp_replay_buffer_size: int = 100000,
+        amp_replay_buffer_size: int = 2000000,
         use_smooth_ratio_clipping: bool = False,
         num_learning_epochs=1,
         num_mini_batches=1,
@@ -117,12 +117,12 @@ class PPO:
                 {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 10e-4,
+                    "weight_decay": 5e-2,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 10e-2,
+                    "weight_decay": 5e-1,
                     "name": "amp_head",
                 },
             ]
@@ -258,6 +258,8 @@ class PPO:
         mean_grad_pen_loss: float = 0.0
         mean_policy_pred: float = 0.0
         mean_expert_pred: float = 0.0
+        mean_policy_loss: float = 0.0
+        mean_expert_loss: float = 0.0
         mean_accuracy_policy: float = 0.0
         mean_accuracy_expert: float = 0.0
         mean_accuracy_policy_elem: float = 0.0
@@ -427,12 +429,13 @@ class PPO:
             ppo_loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
             
             # Process AMP loss by unpacking policy and expert AMP samples.
-            policy_state, policy_next_state = sample_amp_expert
-            expert_state, expert_next_state = sample_amp_policy
+            policy_state, policy_next_state = sample_amp_policy
+            expert_state, expert_next_state = sample_amp_expert
 
             # Normalize AMP observations if a normalizer is provided.
             if self.amp_normalizer is not None:
                 with torch.no_grad():
+                    # print(1)
                     policy_state = self.amp_normalizer.normalize(policy_state)
                     policy_next_state = self.amp_normalizer.normalize(policy_next_state)
                     expert_state = self.amp_normalizer.normalize(expert_state)
@@ -535,6 +538,8 @@ class PPO:
             mean_surrogate_loss += surrogate_loss.item()
             mean_entropy += entropy_batch.mean().item()
             mean_amp_loss += amp_loss.item()
+            mean_policy_loss += policy_loss.item()
+            mean_expert_loss += expert_loss.item()
             mean_grad_pen_loss += grad_pen_loss.item()
             mean_policy_pred += policy_d_prob.mean().item()
             mean_expert_pred += expert_d_prob.mean().item()
@@ -568,6 +573,8 @@ class PPO:
             mean_symmetry_loss /= num_updates
         # -- Clear the storage
         mean_amp_loss /= num_updates
+        mean_expert_loss /= num_updates
+        mean_policy_loss /= num_updates
         mean_grad_pen_loss /= num_updates
         mean_policy_pred /= num_updates
         mean_expert_pred /= num_updates
@@ -581,6 +588,10 @@ class PPO:
             "surrogate": mean_surrogate_loss,
             "entropy": mean_entropy,
             "amp": mean_amp_loss,
+            "mean_policy_loss": mean_policy_loss,
+            "mean_expert_loss":mean_expert_loss,
+            "mean_policy_pred": mean_policy_pred,
+            "mean_expert_pred":mean_expert_pred,
 
         }
         if self.rnd:

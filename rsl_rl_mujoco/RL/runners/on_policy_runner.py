@@ -207,8 +207,8 @@ class OnPolicyRunner:
                         style_rewards = self.discriminator.predict_reward(
                             amp_obs, next_amp_obs, normalizer=self.amp_normalizer
                         )
-                        if it>50:
-                            rewards = 0.9 * rewards + 0.1 * style_rewards
+
+                        rewards = 0.5 * rewards + 0.5 * style_rewards
                         self.alg.process_amp_step(next_amp_obs)
                         amp_obs = torch.clone(next_amp_obs)
                     # process the step

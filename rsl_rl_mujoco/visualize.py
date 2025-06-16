@@ -74,7 +74,8 @@ class PolicyVisualizer:
         
         # Load checkpoint
         if torch.cuda.is_available():
-            checkpoint = torch.load(self.cfg["policy"]["checkpoint"])
+            checkpoint = torch.load(self.cfg["policy"]["checkpoint"], weights_only=False)
+
         else:
             checkpoint = torch.load(self.cfg["policy"]["checkpoint"],map_location=torch.device('cpu'))
         # import ipdb;ipdb.set_trace()
@@ -90,10 +91,10 @@ class PolicyVisualizer:
         vel_dic={}
         if self.cfg['visualization']["wandb"]:
             wandb.init(project="Test_Env")
-        path="Env/data_test"
+        # path="Env/data_test"
         for episode in range(self.cfg["visualization"]["num_episodes"]):
             obs, _ = self.env.reset()
-            data=[obs]
+            # data=[obs.squeeze().tolist()]
             obs=self.obs_normalizer(obs)
             episode_reward = 0
             done = False
@@ -102,14 +103,14 @@ class PolicyVisualizer:
                     actions = self.policy.act_inference(obs)
                 
                 obs, reward, done, info = self.env.step(actions)
-                data.append(obs)
+                # data.append(obs.squeeze().tolist())
                 obs=self.obs_normalizer(obs)
                 episode_reward += reward.item()
                 
                 # Control playback speed
                 time.sleep(1.0 / (self.env.max_episode_length * self.cfg["visualization"]["speedup"]))
             speed=self.env.speed()
-            finish=not info["terminated_info"]['has_fallen'] and not info["terminated_info"]['site_deviation_exceeded'] and not info["terminated_info"]['comY_deviated']
+            finish=not info["terminated_info"]['has_fallen'] and not info["terminated_info"]['site_deviation_exceeded'] 
             print(speed)
             print(info["terminated_info"])
 
@@ -119,9 +120,12 @@ class PolicyVisualizer:
             if finish:
                 vel_dic[speed][1]+=1.
             print(f"Episode {episode + 1}: Reward = {episode_reward:.1f}")
-            data=np.array(data).astype(np.float32)
-            file_path = path / f"data_{i:02d}.npz"
-            np.savez_compressed(file_path, **{"joint_position": data})
+            
+            # data=np.array(data).astype(np.float32)
+            
+            # # import ipdb;ipdb.set_trace()
+            # file_path = os.path.join(path ,f"data_{episode:02d}.npz")
+            # np.savez_compressed(file_path, **{"joint_position": data})
             if self.cfg['visualization']["wandb"]:
                 bin_width = 0.1  # 你可以改成 1.0, 0.2 等
                 max_speed = 3.0

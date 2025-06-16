@@ -8,7 +8,7 @@ env:
 
 train:
   num_steps_per_env: 400 
-  num_learning_iterations: 5000 
+  num_learning_iterations: 10000 
   empirical_normalization: true
 
   save_interval: 100  
@@ -58,7 +58,7 @@ train:
     # rnn_num_layers: 1
   discriminator:
     use: true
-    hidden_dims: [1024,512]
+    hidden_dims: [1024,512,256]
     reward_scale: 1
     amploader:
       amp_data_path: "Env/data_test"
