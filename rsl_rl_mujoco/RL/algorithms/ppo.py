@@ -32,7 +32,7 @@ class PPO:
         discriminator: Discriminator,
         amp_data: None,
         amp_normalizer: Optional[Any],
-        amp_replay_buffer_size: int = 2000000,
+        amp_replay_buffer_size: int = 1000000,
         use_smooth_ratio_clipping: bool = False,
         num_learning_epochs=1,
         num_mini_batches=1,
@@ -117,12 +117,12 @@ class PPO:
                 {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 3e-3,
+                    "weight_decay": 10e-4,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 3e-1,
+                    "weight_decay": 10e-2,
                     "name": "amp_head",
                 },
             ]
@@ -520,8 +520,6 @@ class PPO:
                 self.amp_normalizer.update(policy_state)
                 self.amp_normalizer.update(expert_state)
             # Compute probabilities from the discriminator logits.
-            policy_d_prob = torch.sigmoid(policy_d)
-            expert_d_prob = torch.sigmoid(expert_d)
             # Store the losses
             mean_value_loss += value_loss.item()
             mean_surrogate_loss += surrogate_loss.item()
@@ -530,24 +528,9 @@ class PPO:
             mean_policy_loss += policy_loss.item()
             mean_expert_loss += expert_loss.item()
             mean_grad_pen_loss += grad_pen_loss.item()
-            mean_policy_pred += policy_d_prob.mean().item()
-            mean_expert_pred += expert_d_prob.mean().item()
-            # Calculate the accuracy of the discriminator.
-            mean_accuracy_policy += torch.sum(
-                torch.round(policy_d_prob) == torch.zeros_like(policy_d_prob)
-            ).item()
-            mean_accuracy_expert += torch.sum(
-                torch.round(expert_d_prob) == torch.ones_like(expert_d_prob)
-            ).item()
-            # Record the total number of elements processed.
-            mean_accuracy_expert_elem += expert_d_prob.numel()
-            mean_accuracy_policy_elem += policy_d_prob.numel()
-            # -- RND loss
-            if mean_rnd_loss is not None:
-                mean_rnd_loss += rnd_loss.item()
-            # -- Symmetry loss
-            if mean_symmetry_loss is not None:
-                mean_symmetry_loss += symmetry_loss.item()
+            mean_policy_pred += policy_d.mean().item()
+            mean_expert_pred += expert_d.mean().item()
+
 
         # -- For PPO
         num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -567,8 +550,7 @@ class PPO:
         mean_grad_pen_loss /= num_updates
         mean_policy_pred /= num_updates
         mean_expert_pred /= num_updates
-        mean_accuracy_policy /= mean_accuracy_policy_elem
-        mean_accuracy_expert /= mean_accuracy_expert_elem
+    
         self.storage.clear()
 
         # construct the loss dictionary

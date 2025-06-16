@@ -71,7 +71,7 @@ class Discriminator(nn.Module):
         expert_data = torch.cat([expert_state, expert_next_state], dim=-1)
         expert_data.requires_grad = True
 
-        disc = self.amp_linear(self.trunk(expert_data))
+        disc = self.linear(self.trunk(expert_data))
         ones = torch.ones(disc.size(), device=disc.device)
         grad = autograd.grad(
             outputs=disc, inputs=expert_data,

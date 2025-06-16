@@ -11,7 +11,7 @@ train:
   num_learning_iterations: 10000 
   empirical_normalization: true
 
-  save_interval: 100  
+  save_interval: 200  
   experiment_name: Muscle_Skeleton
   run_name: "test"
 
@@ -58,7 +58,7 @@ train:
     # rnn_num_layers: 1
   discriminator:
     use: true
-    hidden_dims: [1024,512,256]
+    hidden_dims: [1024,512]
     reward_scale: 1
     amploader:
       amp_data_path: "Env/data_test"
