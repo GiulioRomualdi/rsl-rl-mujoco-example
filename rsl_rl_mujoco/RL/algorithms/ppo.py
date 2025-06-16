@@ -117,12 +117,12 @@ class PPO:
                 {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 5e-2,
+                    "weight_decay": 3e-3,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 5e-1,
+                    "weight_decay": 3e-1,
                     "name": "amp_head",
                 },
             ]
@@ -230,19 +230,6 @@ class PPO:
         self.storage.compute_returns(
             last_values, self.gamma, self.lam, normalize_advantage=not self.normalize_advantage_per_mini_batch
         )
-    def discriminator_policy_loss(
-        self, discriminator_output: torch.Tensor
-        ) -> torch.Tensor:
-        loss_fn = torch.nn.BCEWithLogitsLoss()
-        expected = torch.zeros_like(discriminator_output).to(self.device)
-        return loss_fn(discriminator_output, expected)
-
-    def discriminator_expert_loss(
-        self, discriminator_output: torch.Tensor
-        ) -> torch.Tensor:
-        loss_fn = torch.nn.BCEWithLogitsLoss()
-        expected = torch.ones_like(discriminator_output).to(self.device)
-        return loss_fn(discriminator_output, expected)
 
     def update(self):
         if self.useAmp:
@@ -450,8 +437,10 @@ class PPO:
             )
 
             # Compute discriminator losses for expert and policy data.
-            expert_loss = self.discriminator_expert_loss(expert_d)
-            policy_loss = self.discriminator_policy_loss(policy_d)
+            expert_loss = torch.nn.MSELoss()(
+                expert_d, torch.ones(expert_d.size(), device=self.device))
+            policy_loss = torch.nn.MSELoss()(
+                policy_d, -1 * torch.ones(policy_d.size(), device=self.device))
 
             # AMP loss is the average of expert and policy losses.
             amp_loss = 0.5 * (expert_loss + policy_loss)

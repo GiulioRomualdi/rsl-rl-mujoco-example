@@ -68,31 +68,17 @@ class Discriminator(nn.Module):
         expert_next_state: torch.Tensor,
         lambda_: float = 10,
     ) -> torch.Tensor:
-        """Computes the gradient penalty used to regularize the discriminator.
-
-        Args:
-            expert_state (Tensor): Batch of expert states.
-            expert_next_state (Tensor): Batch of expert next states.
-            lambda_ (float): Penalty coefficient.
-
-        Returns:
-            Tensor: Gradient penalty value.
-        """
         expert_data = torch.cat([expert_state, expert_next_state], dim=-1)
         expert_data.requires_grad = True
 
-        disc = self.forward(expert_data)
+        disc = self.amp_linear(self.trunk(expert_data))
         ones = torch.ones(disc.size(), device=disc.device)
-
         grad = autograd.grad(
-            outputs=disc,
-            inputs=expert_data,
-            grad_outputs=ones,
-            create_graph=True,
-            retain_graph=True,
-            only_inputs=True,
-        )[0]
+            outputs=disc, inputs=expert_data,
+            grad_outputs=ones, create_graph=True,
+            retain_graph=True, only_inputs=True)[0]
 
+        # Enforce that the grad norm approaches 0.
         grad_pen = lambda_ * (grad.norm(2, dim=1) - 0).pow(2).mean()
         return grad_pen
 
