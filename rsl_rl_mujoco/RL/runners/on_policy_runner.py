@@ -164,6 +164,8 @@ class OnPolicyRunner:
         if self.useAmp:
             arewbuffer = deque(maxlen=100)
             cur_areward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+            irewbuffer = deque(maxlen=100)
+            cur_ireward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         rewbuffer = deque(maxlen=100)
         lenbuffer = deque(maxlen=100)
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
@@ -207,7 +209,7 @@ class OnPolicyRunner:
                         style_rewards = self.discriminator.predict_reward(
                             amp_obs, next_amp_obs, normalizer=self.amp_normalizer
                         )
-
+                        imitate_reward = rewards
                         rewards = 0.5 * rewards + 0.5 * style_rewards
                         self.alg.process_amp_step(next_amp_obs)
                         amp_obs = torch.clone(next_amp_obs)
@@ -227,6 +229,7 @@ class OnPolicyRunner:
                         cur_reward_sum += rewards
                         if self.useAmp:
                             cur_areward_sum += style_rewards
+                            cur_ireward_sum += imitate_reward
                         # Update episode length
                         cur_episode_length += 1
                         # Clear data for completed episodes
@@ -234,11 +237,13 @@ class OnPolicyRunner:
                         new_ids = (dones > 0).nonzero(as_tuple=False)
                         if self.useAmp:
                             arewbuffer.extend(cur_areward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                            irewbuffer.extend(cur_ireward_sum[new_ids][:, 0].cpu().numpy().tolist())
                         rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
                         lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
                         cur_reward_sum[new_ids] = 0
                         if self.useAmp:
                             cur_areward_sum[new_ids] = 0
+                            cur_ireward_sum[new_ids] = 0
                         cur_episode_length[new_ids] = 0
 
 
@@ -333,6 +338,8 @@ class OnPolicyRunner:
             if self.useAmp:
                 self.writer.add_scalar("Train/mean_style_reward", statistics.mean(locs["arewbuffer"]), locs["it"])
                 self.writer.add_scalar("Train/mean_style_reward_per_step", statistics.mean(locs["arewbuffer"])/statistics.mean(locs["lenbuffer"]), locs["it"])
+                self.writer.add_scalar("Train/mean_imitate_reward", statistics.mean(locs["irewbuffer"]), locs["it"])
+                self.writer.add_scalar("Train/mean_imitate_reward_per_step", statistics.mean(locs["irewbuffer"])/statistics.mean(locs["lenbuffer"]), locs["it"])
             if self.logger_type != "wandb":  # wandb does not support non-integer x-axis logging
                 self.writer.add_scalar("Train/mean_reward/time", statistics.mean(locs["rewbuffer"]), self.tot_time)
                 self.writer.add_scalar(
