@@ -215,7 +215,7 @@ class OnPolicyRunner:
                             amp_obs, next_amp_obs, normalizer=self.amp_normalizer
                         )
                         imitate_reward = rewards
-                        rewards = 0.5 * rewards + 0.5 * style_rewards
+                        rewards = 0 * rewards + 1 * style_rewards
                         self.alg.process_amp_step(next_amp_obs)
                         amp_obs = torch.clone(next_amp_obs)
                     # process the step

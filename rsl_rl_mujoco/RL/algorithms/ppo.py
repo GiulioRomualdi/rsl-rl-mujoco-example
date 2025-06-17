@@ -32,7 +32,7 @@ class PPO:
         discriminator: Discriminator,
         amp_data: None,
         amp_normalizer: Optional[Any],
-        amp_replay_buffer_size: int = 1000000,
+        amp_replay_buffer_size: int = 100000,
         use_smooth_ratio_clipping: bool = False,
         num_learning_epochs=1,
         num_mini_batches=1,
@@ -117,12 +117,12 @@ class PPO:
                 {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 10e-4,
+                    "weight_decay": 1e-4,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 10e-2,
+                    "weight_decay": 1e-2,
                     "name": "amp_head",
                 },
             ]
