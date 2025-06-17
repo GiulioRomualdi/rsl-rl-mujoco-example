@@ -36,7 +36,6 @@ class OnPolicyRunner:
         # import ipdb;ipdb.set_trace()
         # check if multi-gpu is enabled
         self._configure_multi_gpu()
-
         # resolve training type depending on the algorithm
         if self.alg_cfg["class_name"] == "PPO":
             self.training_type = "rl"
@@ -135,7 +134,13 @@ class OnPolicyRunner:
         self.tot_time = 0
         self.current_learning_iteration = 0
         self.git_status_repos = [rsl_rl.__file__]
-
+        if True:
+            loaded_dict = torch.load('model/0.3_3_4mlp/model_4999.pt', weights_only=False)
+            self.alg.policy.load_state_dict(loaded_dict["model_state_dict"])
+            self.obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
+            self.privileged_obs_normalizer.load_state_dict(loaded_dict["privileged_obs_norm_state_dict"])
+            self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
+            self.current_learning_iteration = loaded_dict["iter"]
     def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):  # noqa: C901
         # initialize writer
         if self.log_dir is not None and self.writer is None and not self.disable_logs:
