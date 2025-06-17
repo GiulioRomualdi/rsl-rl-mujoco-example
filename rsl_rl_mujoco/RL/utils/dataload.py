@@ -101,7 +101,7 @@ class AMPLoader:
     ) -> MotionData:
         with open(str(dataset_path), "rb") as f:
             data = pickle.load(f)
-            data_new = np.delete(data, np.s_[182:200], axis=1)
+            data_new = data[:, 6:182]
         # import ipdb;ipdb.set_trace()
         return MotionData(
             joint_positions=data_new,

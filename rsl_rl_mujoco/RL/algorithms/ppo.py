@@ -117,12 +117,12 @@ class PPO:
                 {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 10e-4,
+                    "weight_decay": 1e-4,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 10e-2,
+                    "weight_decay": 1e-2,
                     "name": "amp_head",
                 },
             ]
