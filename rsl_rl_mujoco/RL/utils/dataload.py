@@ -1,4 +1,5 @@
 from pathlib import Path
+import pickle
 from typing import List, Union, Tuple, Generator
 from dataclasses import dataclass
 
@@ -55,13 +56,13 @@ class AMPLoader:
         if isinstance(dataset_path_root, str):
             dataset_path_root = Path(dataset_path_root)
         if dataset_names is None:
-            dataset_names = [p.stem for p in dataset_path_root.glob("*.npz")]
+            dataset_names = [p.stem for p in dataset_path_root.glob("*.pkl")]
         if dataset_weights is None:
             dataset_weights = [1.0] * len(dataset_names)
     
         self.motion_data: List[MotionData] = []
         for dataset_name in dataset_names:
-            dataset_path = dataset_path_root / f"{dataset_name}.npz"
+            dataset_path = dataset_path_root / f"{dataset_name}.pkl"
             md = self.load_data(
                 dataset_path,
             )
@@ -98,10 +99,12 @@ class AMPLoader:
         self,
         dataset_path: Path,
     ) -> MotionData:
-
-        data = np.load(str(dataset_path))
+        with open(str(dataset_path), "rb") as f:
+            data = pickle.load(f)
+            data_new = np.delete(data, np.s_[182:200], axis=1)
+        # import ipdb;ipdb.set_trace()
         return MotionData(
-            joint_positions=data["joint_position"],
+            joint_positions=data_new,
             # joint_velocities=data["joint_velocities"],
             # angle_positions=data["angle_positions"],
             # angle_velocities=data["angle_velocities"],

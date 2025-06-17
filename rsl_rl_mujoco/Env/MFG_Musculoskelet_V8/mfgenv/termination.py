@@ -216,7 +216,7 @@ def is_contact_force_exceeded(env: Any, max_coef: float = 5.0) -> bool:
         # In case of any error, conservatively indicate that the contact force is exceeded.
         return True
     
-def is_site_deviation_exceeded(env: Any, threshold: float = 0.25, relative_to_pelvis: bool = False) -> Tuple[bool, Dict[str, float]]:
+def is_site_deviation_exceeded(env: Any, threshold: float = 0.2, relative_to_pelvis: bool = False) -> Tuple[bool, Dict[str, float]]:
     """
     Check if any sensor site's position deviates from its reference position by more than a specified threshold.
 

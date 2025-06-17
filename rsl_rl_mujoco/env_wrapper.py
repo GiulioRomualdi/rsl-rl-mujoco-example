@@ -51,8 +51,12 @@ class SB3RslVecEnv(VecEnv):
     def get_observations(self):
         obs_tensor = torch.tensor(self._obs, dtype=torch.float32, device=self.device)
         amp_tensor = obs_tensor
+        indices = torch.arange(amp_tensor.shape[1])  # tensor([0, 1, ..., 275])
+        keep_indices = indices[(indices < 182) | (indices > 199)]  # 选出保留的列索引
+
+        amp_tensor_new = amp_tensor[:, keep_indices]
         # import ipdb;ipdb.set_trace()
-        return obs_tensor, {"observations": {"policy": obs_tensor,"amp": amp_tensor}}
+        return obs_tensor, {"observations": {"policy": obs_tensor,"amp": amp_tensor_new}}
 
     def reset(self):
         out = self.env.reset()
@@ -80,7 +84,11 @@ class SB3RslVecEnv(VecEnv):
         rewards_tensor = torch.tensor(reward_batch,    dtype=torch.float32, device=self.device)
         dones_tensor   = torch.tensor(done_batch,      dtype=torch.long,    device=self.device)
         amp_tensor     = obs_tensor
-        extras = {"observations": {"policy": obs_tensor,"amp": amp_tensor}}
+        indices = torch.arange(amp_tensor.shape[1])  # tensor([0, 1, ..., 275])
+        keep_indices = indices[(indices < 182) | (indices > 199)]  # 选出保留的列索引
+
+        amp_tensor_new = amp_tensor[:, keep_indices]
+        extras = {"observations": {"policy": obs_tensor,"amp": amp_tensor_new}}
         if not self.cfg.is_finite_horizon:
             truncated_flags = [
                 info.get("TimeLimit.truncated", False)
