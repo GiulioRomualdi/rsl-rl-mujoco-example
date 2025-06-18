@@ -66,7 +66,7 @@ class Discriminator(nn.Module):
         self,
         expert_state: torch.Tensor,
         expert_next_state: torch.Tensor,
-        lambda_: float = 10,
+        lambda_: float = 15,
     ) -> torch.Tensor:
         expert_data = torch.cat([expert_state, expert_next_state], dim=-1)
         expert_data.requires_grad = True
@@ -78,7 +78,8 @@ class Discriminator(nn.Module):
             grad_outputs=ones, create_graph=True,
             retain_graph=True, only_inputs=True)[0]
 
-        # Enforce that the grad norm approaches 0.
+        # Enforce that the 
+        # grad norm approaches 0.
         grad_pen = lambda_ * (grad.norm(2, dim=1) - 0).pow(2).mean()
         return grad_pen
 

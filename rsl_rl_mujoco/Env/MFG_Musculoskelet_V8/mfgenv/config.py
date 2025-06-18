@@ -79,10 +79,10 @@ def load_config(config_path: Optional[Union[str, Path]] = None, overrides: Dict[
             'goal': 0.00,
         },
         "imitation_weights": {
-            "site_pos": 0.79,
-            "site_vel": 0.01,
-            "joint_angle": 0.195,
-            "joint_angvel": 0.005
+            "site_pos": 0.65,
+            "site_vel": 0.1,
+            "joint_angle": 0.2,
+            "joint_angvel": 0.05
         },
         "smooth_weights": {
             "grf": 0.0,

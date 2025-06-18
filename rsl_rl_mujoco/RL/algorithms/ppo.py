@@ -114,19 +114,19 @@ class PPO:
             self.amp_data: AMPLoader = amp_data
             self.amp_normalizer: Optional[Any] = amp_normalizer
             params = [
-                {"params": self.policy.parameters(), "name": "actor_critic"},
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 1e-4,
+                    "weight_decay": 5e-6,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 1e-2,
+                    "weight_decay": 5e-5,
                     "name": "amp_head",
                 },
             ]
-            self.optimizer = optim.Adam(params=params, lr=learning_rate)
+            self.optimizer = optim.Adam(params=self.policy.parameters(), lr=learning_rate)
+            self.amp_optimizer = optim.Adam(params=params)
         else: 
             self.optimizer = optim.Adam(params=self.policy.parameters(), lr=learning_rate)
         # Create rollout storage
@@ -492,12 +492,14 @@ class PPO:
                 # compute the loss as the mean squared error
                 mseloss = torch.nn.MSELoss()
                 rnd_loss = mseloss(predicted_embedding, target_embedding)
-
-            loss = ppo_loss + (amp_loss + grad_pen_loss)
+            amp_loss_sum=amp_loss + grad_pen_loss
+            # loss = ppo_loss + (amp_loss + grad_pen_loss)
             # Compute the gradients
             # -- For PPO
             self.optimizer.zero_grad()
-            loss.backward()
+            ppo_loss.backward()
+            self.amp_optimizer.zero_grad()
+            amp_loss_sum.backward()
             # -- For RND
             if self.rnd:
                 self.rnd_optimizer.zero_grad()  # type: ignore
@@ -511,6 +513,7 @@ class PPO:
             # -- For PPO
             nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.optimizer.step()
+            self.amp_optimizer.step()
             # -- For RND
             if self.rnd_optimizer:
                 self.rnd_optimizer.step()

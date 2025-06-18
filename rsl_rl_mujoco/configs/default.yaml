@@ -57,7 +57,7 @@ train:
     # rnn_hidden_dim: 512
     # rnn_num_layers: 1
   discriminator:
-    use: true
+    use: False
     hidden_dims: [1024,512]
     reward_scale: 1
     amploader:
@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/test_amp"
+log_dir: "./logs/400_without_amp"

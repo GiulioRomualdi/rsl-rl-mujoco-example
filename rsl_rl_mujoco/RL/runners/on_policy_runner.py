@@ -134,7 +134,7 @@ class OnPolicyRunner:
         self.tot_time = 0
         self.current_learning_iteration = 0
         self.git_status_repos = [rsl_rl.__file__]
-        if True:
+        if False:
             loaded_dict = torch.load('model/0.3_3_4mlp/model_4999.pt', weights_only=False)
             self.alg.policy.load_state_dict(loaded_dict["model_state_dict"])
             self.obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
@@ -215,7 +215,7 @@ class OnPolicyRunner:
                             amp_obs, next_amp_obs, normalizer=self.amp_normalizer
                         )
                         imitate_reward = rewards
-                        rewards = 0 * rewards + 1 * style_rewards
+                        rewards = style_rewards
                         self.alg.process_amp_step(next_amp_obs)
                         amp_obs = torch.clone(next_amp_obs)
                     # process the step
