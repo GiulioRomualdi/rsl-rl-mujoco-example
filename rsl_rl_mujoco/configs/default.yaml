@@ -3,8 +3,8 @@ hydra:
     dir: .
   output_subdir: null
 env:
-  id: "MFG_MS_V8"
-  num_envs: 64
+  id: "MFG_MS_V9"
+  num_envs: 32
 
 train:
   num_steps_per_env: 400 
@@ -57,7 +57,7 @@ train:
     # rnn_hidden_dim: 512
     # rnn_num_layers: 1
   discriminator:
-    use: true
+    use: false
     hidden_dims: [1024,512]
     reward_scale: 1
     amploader:
@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/400_without_amp"
+log_dir: "./logs/test"
