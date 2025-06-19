@@ -57,7 +57,7 @@ train:
     # rnn_hidden_dim: 512
     # rnn_num_layers: 1
   discriminator:
-    use: False
+    use: true
     hidden_dims: [1024,512]
     reward_scale: 1
     amploader:
