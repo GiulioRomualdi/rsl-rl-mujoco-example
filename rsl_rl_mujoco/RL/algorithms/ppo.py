@@ -116,12 +116,14 @@ class PPO:
             params = [
                 {
                     "params": self.discriminator.trunk.parameters(),
-                    "weight_decay": 5e-6,
+                    "weight_decay": 10e-4,
+                    "lr": 5e-7,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
-                    "weight_decay": 5e-5,
+                    "weight_decay": 10e-2,
+                    "lr": 1e-6,
                     "name": "amp_head",
                 },
             ]
@@ -418,7 +420,7 @@ class PPO:
             # Process AMP loss by unpacking policy and expert AMP samples.
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
-
+            # import ipdb;ipdb.set_trace()
             # Normalize AMP observations if a normalizer is provided.
             if self.amp_normalizer is not None:
                 with torch.no_grad():
