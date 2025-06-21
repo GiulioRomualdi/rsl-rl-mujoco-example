@@ -117,13 +117,13 @@ class PPO:
                 {
                     "params": self.discriminator.trunk.parameters(),
                     "weight_decay": 10e-4,
-                    "lr": 5e-7,
+                    "lr": 1e-5,
                     "name": "amp_trunk",
                 },
                 {
                     "params": self.discriminator.linear.parameters(),
                     "weight_decay": 10e-2,
-                    "lr": 1e-6,
+                    "lr": 1e-5,
                     "name": "amp_head",
                 },
             ]
@@ -275,7 +275,7 @@ class PPO:
             mini_batch_size=(
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            // self.num_mini_batches,
+            //(self.num_mini_batches * 200),
             allow_replacement=True,
         )
         amp_expert_generator = self.amp_data.feed_forward_generator(
@@ -283,9 +283,9 @@ class PPO:
             (
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            // self.num_mini_batches,
+            // (self.num_mini_batches * 200),
         )
-        # iterate over batches
+        # import ipdb;ipdb.set_trace()# iterate over batches
         for (
             obs_batch,
             critic_obs_batch,
@@ -302,7 +302,7 @@ class PPO:
             ), sample_amp_policy, sample_amp_expert in zip(
                 generator, amp_policy_generator, amp_expert_generator
             ):
-
+            
             # number of augmentations per sample
             # we start with 1 and increase it if we use symmetry augmentation
             num_aug = 1
@@ -420,6 +420,8 @@ class PPO:
             # Process AMP loss by unpacking policy and expert AMP samples.
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
+            # print(policy_state.shape)
+            # print(expert_state.shape)
             # import ipdb;ipdb.set_trace()
             # Normalize AMP observations if a normalizer is provided.
             if self.amp_normalizer is not None:
@@ -443,7 +445,7 @@ class PPO:
                 expert_d, torch.ones(expert_d.size(), device=self.device))
             policy_loss = torch.nn.MSELoss()(
                 policy_d, -1 * torch.ones(policy_d.size(), device=self.device))
-
+            # print(expert_loss,policy_loss)
             # AMP loss is the average of expert and policy losses.
             amp_loss = 0.5 * (expert_loss + policy_loss)
 
