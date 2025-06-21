@@ -66,7 +66,7 @@ class Discriminator(nn.Module):
         self,
         expert_state: torch.Tensor,
         expert_next_state: torch.Tensor,
-        lambda_: float = 15,
+        lambda_: float = 10,
     ) -> torch.Tensor:
         expert_data = torch.cat([expert_state, expert_next_state], dim=-1)
         expert_data.requires_grad = True
