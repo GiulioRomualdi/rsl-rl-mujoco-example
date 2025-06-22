@@ -4,7 +4,7 @@ hydra:
   output_subdir: null
 env:
   id: "MFG_MS_V9"
-  num_envs: 32
+  num_envs: 64
 
 train:
   num_steps_per_env: 400 

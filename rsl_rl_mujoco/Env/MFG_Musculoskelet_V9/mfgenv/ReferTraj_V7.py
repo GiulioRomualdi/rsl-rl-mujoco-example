@@ -362,6 +362,8 @@ class ReferenceTrajectories:
 
         # load qpos and qvel (read‐only views)
         self.qpos, self.qvel = self.manager.get(self.traj_id)
+        self.qpos.setflags(write=False)
+        self.qvel.setflags(write=False)
         assert not self.qpos.flags.writeable and not self.qvel.flags.writeable, \
             "Underlying trajectory data must be read-only"
             

@@ -11,7 +11,7 @@ from typing import Any, Tuple, Dict, Optional, Union
 import numpy as np
 from numba import njit
 
-from mfgenv.common_utils import (
+from .common_utils import (
     quat_to_mat,
     orient6_to_mat,
     rotation_geodesic,

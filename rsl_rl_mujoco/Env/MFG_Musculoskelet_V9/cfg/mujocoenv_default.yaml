@@ -3,7 +3,7 @@
 # --------------------------------------
 # MuJoCoEnv / BaseEnv parameters
 # --------------------------------------
-model_path: "MFG_Raj2015_V9.xml"
+model_path: Env\MFG_Musculoskelet_V9\MFG_Raj2015_V9.xml
 default_frame_skip: 5
 render_mode: null
 # (Optional) override XML integrator timestep (seconds)
@@ -15,7 +15,7 @@ use_muscle: false
 # Shared TrajectoryManager parameters
 # --------------------------------------
 traj_manager:
-  data_path: "processed_trajs"
+  data_path: Env\processed_trajs
   sample_frequency: 100
   speed_range: [0.0, 3.0]
   verbose: false

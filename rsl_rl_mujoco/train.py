@@ -11,7 +11,7 @@ from rsl_rl_mujoco.env_wrapper import SB3RslVecEnv
 from RL.runners import OnPolicyRunner
 from hydra import main
 
-from Env.MFG_Musculoskelet_V9.mfgenv.ReferTraj_V6 import TrajectoryManager
+from Env.MFG_Musculoskelet_V9.mfgenv.ReferTraj_V7 import TrajectoryManager
 from Env.MFG_Musculoskelet_V9.mfgenv.mfg_MSenv import MFG_Musculoskeletal_V9
 
 class TMProxyManager(BaseManager): pass
@@ -71,14 +71,8 @@ if __name__ == "__main__":
     tm_args = base_cfg["traj_manager"]    # 直接拿，不 pop
     shared_tm = manager.TrajectoryManager(
         data_path=tm_args["data_path"],
-        repeat_times=int(tm_args["repeat_times"]),
         sample_frequency=float(tm_args["sample_frequency"]),
-        knee_1dof=bool(tm_args["knee_1dof"]),
-        enable_mirroring=bool(tm_args["enable_mirroring"]),
-        smoothing_sigma=(None if tm_args["smoothing_sigma"] is None else float(tm_args["smoothing_sigma"])),
-        splice_overlap=int(tm_args["splice_overlap"]),
         speed_range=(float(tm_args["speed_range"][0]), float(tm_args["speed_range"][1])),
-        uniform_length=bool(tm_args["uniform_length"]),
         verbose=bool(tm_args["verbose"])
     )
 

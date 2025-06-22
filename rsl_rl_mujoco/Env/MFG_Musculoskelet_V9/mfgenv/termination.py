@@ -117,7 +117,7 @@ def _has_fallen(
 
 def _site_deviation_exceeded(
     obs_components: Dict[str, Any],
-    threshold: float = 0.15
+    threshold: float = 0.25
     ) -> Tuple[bool, Dict[str, float]]:
     """
     Check if any body‐site deviates from reference by more than threshold.
