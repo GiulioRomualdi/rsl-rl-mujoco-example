@@ -3,7 +3,7 @@
 # --------------------------------------
 # MuJoCoEnv / BaseEnv parameters
 # --------------------------------------
-model_path: Env\MFG_Musculoskelet_V9\MFG_Raj2015_V9.xml
+model_path: "MFG_Raj2015_V9.xml"
 default_frame_skip: 5
 render_mode: null
 # (Optional) override XML integrator timestep (seconds)
@@ -15,15 +15,9 @@ use_muscle: false
 # Shared TrajectoryManager parameters
 # --------------------------------------
 traj_manager:
-  data_path: Env\MFG_mocap
-  repeat_times: 10
+  data_path: "processed_trajs"
   sample_frequency: 100
-  knee_1dof: true
-  enable_mirroring: true
-  smoothing_sigma: null
-  splice_overlap: 10
-  speed_range: [0.3, 3.0]
-  uniform_length: false
+  speed_range: [0.0, 3.0]
   verbose: false
   
 # --------------------------------------
@@ -38,10 +32,10 @@ reward_weights:
 # Imitation‐term sub‐weights
 # --------------------------------------
 imitation_weights:
-  site_pos: 0.65
-  site_vel: 0.1
-  joint_angle: 0.2
-  joint_angvel: 0.05
+  site_pos: 0.79
+  site_vel: 0.01
+  joint_angle: 0.195
+  joint_angvel: 0.005
 
 # --------------------------------------
 # Smoothness‐term sub‐weights
@@ -73,7 +67,7 @@ goal_switch_interval: 1.0      # seconds between goal updates
 # --------------------------------------
 # Episode
 # --------------------------------------
-max_episode_steps: 400
+max_episode_steps: 500
 relative_pelvis: false
 
 # --------------------------------------
@@ -81,7 +75,7 @@ relative_pelvis: false
 # --------------------------------------
 increment: 2
 max_hold_steps: 5
-traj_seed: null # 123
+traj_seed: null
 rt_verbose: false
 
 # --------------------------------------

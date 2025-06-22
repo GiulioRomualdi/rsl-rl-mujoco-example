@@ -38,48 +38,52 @@ def compute_grf(body_id: int,
     Parameters
     ----------
     body_id : int
-        MuJoCo body ID of the foot (e.g., calcaneus).
-    geom_ids : np.ndarray, shape=(G,)
-        Array of geom IDs belonging to that foot.
+        MuJoCo body ID of the foot (e.g. calcaneus).
+    geom_ids : List[int]
+        List of geom IDs belonging to that foot.
     env : Any
-        Must have:
-            - data: with attributes
-                * xpos (Nbody×3), contact.geom1/geom2 (ncon,), contact.pos (ncon×3), contact.frame (ncon×9), ncon (int)
-            - model: with body() and optionally pelvis body
-            - relative_pelvis: bool
-            - pelvis_heading: (3,) unit vector in world XY-plane
+        Environment with attributes:
+          - data (MjData): simulation state, includes .xpos, .ncon, .contact
+          - model (MjModel): for mj_contactForce
+          - relative_pelvis (bool): whether to express in pelvis frame
+          - pelvis_heading (np.ndarray, shape=(3,)): x-axis of pelvis frame
 
     Returns
     -------
-    pos_local : (3,) weighted-avg contact point in chosen frame
-    force_local : (3,) net contact force in chosen frame
-    torque_local : (3,) net contact torque about body origin
+    pos_local : np.ndarray, shape=(3,)
+        Weighted‐average contact point in chosen frame.
+    force_local : np.ndarray, shape=(3,)
+        Net contact force in chosen frame.
+    torque_local : np.ndarray, shape=(3,)
+        Net contact torque about body reference in chosen frame.
     """
     data = env.data
     model = env.model
     
-    # Reference point and origin offset
+    # Origin offset
     ref_pos = data.xpos[body_id]
-    if ref_pos.shape != (3,):
-        raise ValueError(f"Expected data.xpos[{body_id}].shape==(3,), got {ref_pos.shape}")
+    
     if env.relative_pelvis:
-        pid = model.body("pelvis").id
-        origin_offset = data.xpos[pid]
+        pid = model.body('pelvis').id
+        origin = data.xpos[pid]
     else:
-        origin_offset = np.zeros(3, dtype=float)
+        origin = np.zeros(3, dtype=np.float64)
     
-    ncon    = data.ncon
-    geom1   = data.contact.geom1[:ncon]
-    geom2   = data.contact.geom2[:ncon]
-    pos_all = data.contact.pos[:ncon]
-    frame9  = data.contact.frame[:ncon]
+    ncon = data.ncon
     try:
-        frame_mats = frame9.reshape(-1,3,3)
-    except ValueError:
-        raise ValueError("Malformed data.contact.frame; expected ncon×9 array")
-    
-    mask = np.isin(geom1, geom_ids) | np.isin(geom2, geom_ids)
-    if not np.any(mask):
+        frames = data.contact.frame[:ncon].reshape(ncon, 3, 3)
+    except Exception as e:
+        raise ValueError(f"Invalid contact frame shape: {e}")
+        
+    g1 = data.contact.geom1[:ncon]
+    g2 = data.contact.geom2[:ncon]
+    pos_all = data.contact.pos[:ncon]
+    foot_geoms = set(geom_ids)
+
+    mask = np.array([i in foot_geoms for i in g1], bool) | \
+           np.array([i in foot_geoms for i in g2], bool)
+    idxs = np.nonzero(mask)[0]
+    if idxs.size == 0:
         return np.zeros(3), np.zeros(3), np.zeros(3)
     
     total_force  = np.zeros(3, dtype=float)
@@ -87,94 +91,132 @@ def compute_grf(body_id: int,
     weighted_pos = np.zeros(3, dtype=float)
     tmp = np.zeros(6, dtype=float)
     
-    for i in np.nonzero(mask)[0]:
+    forces = []
+    positions = []
+    tmp = np.zeros(6, dtype=np.float64)
+    for i in idxs:
         try:
             mujoco.mj_contactForce(model, data, i, tmp)
         except RuntimeError:
             continue
-        f_world = frame_mats[i].T.dot(tmp[:3])
-        p_world = pos_all[i]
-        total_force  += f_world
-        total_torque += np.cross(p_world - ref_pos, f_world)
-        weighted_pos += p_world * f_world
+        f_w = frames[i].T.dot(tmp[:3])  # world-frame force
+        forces.append(f_w)
+        positions.append(pos_all[i])
+
+    if not forces:
+        return np.zeros(3), np.zeros(3), np.zeros(3)
+    
+    forces_arr = np.stack(forces, axis=0)      # (K,3)
+    pos_arr    = np.stack(positions, axis=0)   # (K,3)
+
+    total_force  = forces_arr.sum(axis=0)                     # (3,)
+    weighted_pos = (forces_arr * pos_arr).sum(axis=0)         # (3,)
+    r_vecs       = pos_arr - ref_pos                          # (K,3)
+    torques      = np.cross(r_vecs, forces_arr)               # (K,3)
+    total_torque = torques.sum(axis=0)                        # (3,)
 
     if np.allclose(total_force, 0.0):
         return np.zeros(3), np.zeros(3), np.zeros(3)
 
-    avg_pos_world = weighted_pos / np.where(total_force!=0, total_force, 1.0)
-    pos_rel_world = avg_pos_world - origin_offset
+    avg_contact = weighted_pos / total_force                  # (3,)
+    contact_rel = avg_contact - origin                        # (3,)
 
     if env.relative_pelvis:
         xh = env.pelvis_heading
-        yh = np.array([0.0,0.0,1.0], dtype=float)
+        yh = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
-        zn = np.linalg.norm(zh)
-        if zn < 1e-6:
-            zh = np.array([0.0,1.0,0.0], dtype=float)
-        else:
-            zh /= zn
+        zh /= (np.linalg.norm(zh) + 1e-12)
         xh = np.cross(yh, zh)
-        xh /= np.linalg.norm(xh)
-        R = np.stack((xh, yh, zh), axis=1)
+        xh /= (np.linalg.norm(xh) + 1e-12)
+        R = np.stack((xh, yh, zh), axis=1)  # world→pelvis basis
         Rw2l = R.T
-        return (Rw2l.dot(pos_rel_world),
-                Rw2l.dot(total_force),
-                Rw2l.dot(total_torque))
+        pos_local    = Rw2l.dot(contact_rel)
+        force_local  = Rw2l.dot(total_force)
+        torque_local = Rw2l.dot(total_torque)
     else:
-        return pos_rel_world, total_force, total_torque
+        pos_local, force_local, torque_local = contact_rel, total_force, total_torque
+
+    return pos_local, force_local, torque_local
 
 def get_GRF_info(env: Any) -> Tuple[np.ndarray, Dict[str, Dict[str, np.ndarray]]]:
     """
-    Compute GRF information for both feet and concatenate into an 18-dimensional vector.
-    
-    Caches foot body IDs and geom sets on first call as:
-      env._grf_foot_ids  = {'right': int, 'left': int}
-      env._grf_geom_sets = {'right': np.ndarray, 'left': np.ndarray}
+    Compute ground reaction forces (GRF) for both feet and return a concatenated vector.
+
+    This function does not reshape or copy more than necessary and only caches the
+    foot body IDs and their geom ID lists on first call.
+
+    Parameters
+    ----------
+    env : Any
+        Environment instance providing:
+          - env.data.ncon : int, number of contacts
+          - env.model.body(name).id : int, body IDs for 'calcn_r' and 'calcn_l'
+          - env.model.geom(name).id : int, geom IDs under each foot
+          - compute_grf(body_id, geom_ids, env) : function returning (pos, force, torque)
 
     Returns
     -------
-    grf_concat : np.ndarray, shape=(18,)
-        [r_pos, r_force, r_torque, l_pos, l_force, l_torque], each 3D.
+    grf_vec : np.ndarray, shape=(18,)
+        [r_pos(3), r_force(3), r_torque(3), l_pos(3), l_force(3), l_torque(3)]
     info : dict
         {
-          'right': {'GRF_pos': ..., 'GRF_force': ..., 'GRF_torque': ...},
-          'left':  {'GRF_pos': ..., 'GRF_force': ..., 'GRF_torque': ...}
+          'right': {'GRF_pos': np.ndarray(3,), 'GRF_force': np.ndarray(3,), 'GRF_torque': np.ndarray(3,)},
+          'left':  {...}
         }
+
+    Notes
+    -----
+    - If there are no contacts (env.data.ncon == 0), returns zeros.
+    - Caches `env._grf_foot_cfg = {'right': (body_id, geom_ids), 'left': (...)}` on first call.
     """
     # early-out if no contacts
     if env.data.ncon == 0:
-        zeros = np.zeros(3, dtype=float)
-        return np.zeros(18, dtype=float), {
+        zeros = np.zeros(3, dtype=np.float64)
+        grf_vec = np.zeros(18, dtype=np.float64)
+        return grf_vec, {
             'right': {'GRF_pos': zeros, 'GRF_force': zeros, 'GRF_torque': zeros},
             'left':  {'GRF_pos': zeros, 'GRF_force': zeros, 'GRF_torque': zeros}
         }
     
     # cache foot IDs & geom sets
-    if not hasattr(env, "_grf_foot_ids"):
+    if not hasattr(env, "_grf_foot_cfg"):
         try:
-            r_id = env.model.body('calcn_r').id
-            l_id = env.model.body('calcn_l').id
-            r_geoms = np.array([env.model.geom(n).id for n in 
-                                ['C_r_foot1','C_r_foot3','C_r_foot4','C_r_bofoot1','C_r_bofoot2']], int)
-            l_geoms = np.array([env.model.geom(n).id for n in 
-                                ['C_l_foot1','C_l_foot3','C_l_foot4','C_l_bofoot1','C_l_bofoot2']], int)
+            r_body = env.model.body('calcn_r').id
+            l_body = env.model.body('calcn_l').id
+            # adjust these names to match your model's foot‐geom names
+            right_geoms = [
+                env.model.geom(n).id for n in
+                ['C_r_foot1','C_r_foot3','C_r_foot4','C_r_bofoot1','C_r_bofoot2']
+            ]
+            left_geoms = [
+                env.model.geom(n).id for n in
+                ['C_l_foot1','C_l_foot3','C_l_foot4','C_l_bofoot1','C_l_bofoot2']
+            ]
         except Exception as e:
-            raise ValueError(f"Failed to retrieve foot IDs or geoms: {e}")
-        env._grf_foot_ids  = {'right': r_id, 'left': l_id}
-        env._grf_geom_sets = {'right': r_geoms, 'left': l_geoms}
+            raise ValueError(f"Failed to retrieve foot bodies or geoms: {e}")
+        env._grf_foot_cfg = {
+            'right': (r_body, right_geoms),
+            'left':  (l_body,  left_geoms)
+        }
     
-    # compute for each side
-    rv = compute_grf(env._grf_foot_ids['right'],
-                     env._grf_geom_sets['right'], env)
-    lv = compute_grf(env._grf_foot_ids['left'],
-                     env._grf_geom_sets['left'], env)
-    
-    # concatenate and build info dict
-    grf_vec = np.hstack((rv[0], rv[1], rv[2], lv[0], lv[1], lv[2]))
-    info = {
-        'right': {'GRF_pos': rv[0], 'GRF_force': rv[1], 'GRF_torque': rv[2]},
-        'left':  {'GRF_pos': lv[0], 'GRF_force': lv[1], 'GRF_torque': lv[2]}
-    }
+    cfg = env._grf_foot_cfg
+    grf_vec = np.empty(18, dtype=np.float64)
+    info: Dict[str, Dict[str, np.ndarray]] = {'right': {}, 'left': {}}
+
+    # fill in for each foot
+    for idx, side in enumerate(('right', 'left')):
+        body_id, geom_ids = cfg[side]
+        pos, force, torque = compute_grf(body_id, geom_ids, env)
+        base = idx * 9
+        grf_vec[base:base+3]   = pos
+        grf_vec[base+3:base+6] = force
+        grf_vec[base+6:base+9] = torque
+        info[side] = {
+            'GRF_pos':    pos,
+            'GRF_force':  force,
+            'GRF_torque': torque
+        }
+
     return grf_vec, info
 
 def normalize_grf(
@@ -295,7 +337,7 @@ def compute_ref_pelvis_kinematics(
     ----------
     env : Any
         Must provide:
-          - env.ref_traj.get_extend_refer() -> (ref_qpos, ref_qvel)
+          - env.ref_traj.get_reference_trajectories() -> (ref_qpos, ref_qvel)
     use_free_joint : bool, default=True
         If False, assumes ref_qpos/ref_qvel are already in "ref-traj" format:
             pos    = ref_qpos[0:3]
@@ -325,7 +367,7 @@ def compute_ref_pelvis_kinematics(
         If reference arrays are too short or conversion fails.
     """
     try:
-        ref_qpos, ref_qvel = env.ref_traj.get_extend_refer()
+        ref_qpos, ref_qvel = env.ref_traj.get_reference_trajectories()
     except Exception as e:
         raise ValueError(f"Failed to get reference qpos/qvel: {e}")
 
@@ -403,8 +445,10 @@ def get_pelvis_kinematics(
     if qpos is None or qvel is None:
         raise ValueError("env.data.qpos and qvel must be present")
     if qpos.shape[0] < 7 or qvel.shape[0] < 6:
-        raise ValueError(f"Expected len(qpos)>=7 and len(qvel)>=6, got "
-                         f"{qpos.shape[0]}, {qvel.shape[0]}")
+        raise ValueError(
+            f"Expected len(qpos)>=7 and len(qvel)>=6, got "
+            f"{qpos.shape[0]} and {qvel.shape[0]}"
+        )
         
     if use_free_joint:
         state = np.empty(13, dtype=np.float64)
@@ -442,18 +486,34 @@ def get_pelvis_kinematics(
     }
     return state, comp
 
-def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
+def compute_ref_site_kinematics(
+        env: Any
+        ) -> Dict[str, Dict[str, np.ndarray]]:
     """
-    Compute reference‐trajectory site kinematics by placing the model at the current
-    ref qpos/qvel, running a forward pass, and extracting each joint‐site’s global
-    or pelvis‐relative position, linear velocity, orientation (6D), and angular
-    velocity.
-    
+    Compute reference‐trajectory kinematics for all non‐pelvis joint sites.
+
+    This function:
+      1. Retrieves the current 37→43‐DOF reference qpos/qvel from env.ref_traj.
+      2. Converts them into MuJoCo qpos/qvel via `convert_ref_traj_*`.
+      3. Reuses a single MjData buffer to run mj_forward.
+      4. If `env.relative_pelvis` is True, computes a pelvis‐aligned frame (R_w2b),
+         origin offset, and pelvis linear/angular base velocities.
+      5. For each site in `env._joint_sites`, extracts:
+         - world‐frame site position (`data.site_xpos`),
+         - linear velocity via `site_xmat @ sensordata[vadr:vadr+vdim]`,
+         - angular velocity via `site_xmat @ sensordata[gadr:gadr+gdim]`,
+         - a 6D orientation matrix via the first two columns of `site_xmat`.
+      6. Transforms all vectors into the chosen frame and casts to float32.
+
     Parameters
     ----------
     env : Any
-        Environment instance. Must provide:
-          - env.model : mujoco.MjModel
+        Must provide:
+          - env.model           : mujoco.MjModel
+          - env.ref_traj        : ReferenceTrajectories with get_reference_trajectories()
+          - env._joint_sites    : List of tuples
+                (site_id, site_name, (vadr,vdim), (gadr,gdim))
+          - env._pelvis_gyro    : (gadr_pel, gdim_pel) for pelvis gyro sensor
           - env.relative_pelvis : bool
 
     Returns
@@ -461,29 +521,37 @@ def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
     Dict[str, Dict[str, np.ndarray]]
         {
           "pos":    {site_name: np.ndarray(3,)},
-          "linvel":    {site_name: np.ndarray(3,)},
+          "linvel": {site_name: np.ndarray(3,)},
           "orient": {site_name: np.ndarray(6,)},
           "angvel": {site_name: np.ndarray(3,)}
         }
+
+    Raises
+    ------
+    ValueError
+        If reference conversion fails or qpos/qvel length mismatches model.
     """
     model = env.model
+    
+    if not hasattr(env, "_ref_data"):
+        env._ref_data = mujoco.MjData(model)
+    data = env._ref_data
+    
     joint_sites = env._joint_sites
-    gadr_pel, gdim_pel = env._pelvis_gyro
     
-    data = mujoco.MjData(model)
-    
-    ref_qpos, ref_qvel = env.ref_traj.get_extend_refer()
+    ref_qpos, ref_qvel = env.ref_traj.get_reference_trajectories()
     try:
         d_qpos = convert_ref_traj_qpos(ref_qpos) 
         d_qvel = convert_ref_traj_qvel(ref_qvel, ref_qpos)
     except Exception as e:
         raise ValueError(f"Reference conversion error: {e}")
     
-    if d_qpos.shape[0] != model.nq or d_qvel.shape[0] != model.nv:
+    if d_qpos.size != model.nq or d_qvel.size != model.nv:
         raise ValueError(
-            f"Expected qpos size {model.nq}, qvel size {model.nv}; "
-            f"got {d_qpos.shape[0]}, {d_qvel.shape[0]}"
+            f"Expected qpos size={model.nq}, qvel size={model.nv}; "
+            f"got {d_qpos.size}, {d_qvel.size}"
         )
+        
     data.qpos[:] = d_qpos
     data.qvel[:] = d_qvel
     mujoco.mj_forward(model, data)
@@ -491,8 +559,10 @@ def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
     if env.relative_pelvis:
         pel_bid = model.body("pelvis").id
         pel_sid = model.site("pelvis_sensor").id
+        
         origin = data.xpos[pel_bid].copy()
         vpl_w  = data.qvel[0:3].copy()
+        gadr_pel, gdim_pel = env._pelvis_gyro
         if gadr_pel is not None and gdim_pel >= 3:
             mat_p   = data.site_xmat[pel_sid].reshape(3,3)
             raw_pg  = data.sensordata[gadr_pel:gadr_pel+gdim_pel]
@@ -504,25 +574,25 @@ def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
         xh = mat_pel[:,0].copy()
         xh[2] = 0.0
         norm = np.linalg.norm(xh)
-        xh = xh/norm if norm>1e-8 else np.array([1.0,0.0,0.0])
-        
-        yh = np.array([0.0, 0.0, 1.0]) 
+        xh = xh / (norm if norm>1e-8 else 1.0)
+        yh = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
         zn = np.linalg.norm(zh)
-        zh = zh/zn if zn>1e-8 else np.array([0.0,1.0,0.0])
+        zh = zh / (zn if zn>1e-8 else 1.0)
         xh = np.cross(yh, zh)
         xh /= np.linalg.norm(xh)
-        Rb    = np.stack((xh, yh, zh), axis=1)
+        Rb   = np.stack((xh, yh, zh), axis=1)
         R_w2b = Rb.T
     else:
-        origin = np.zeros(3)
-        vpl_w  = np.zeros(3)
-        vpa_w  = np.zeros(3)
-        R_w2b  = np.eye(3)
+        origin = np.zeros(3, dtype=np.float64)
+        vpl_w  = np.zeros(3, dtype=np.float64)
+        vpa_w  = np.zeros(3, dtype=np.float64)
+        R_w2b  = np.eye(3, dtype=np.float64)
     
     xpos = data.site_xpos
     xmat = data.site_xmat.reshape(-1,3,3)
     sd   = data.sensordata
+    
     pos_dict:    Dict[str, np.ndarray] = {}
     vel_dict:    Dict[str, np.ndarray] = {}
     orient_dict: Dict[str, np.ndarray] = {}
@@ -532,7 +602,10 @@ def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
         mat = xmat[sid]
         pw  = xpos[sid]
         vw  = mat.dot(sd[vadr:vadr+vdim])
-        ww  = mat.dot(sd[gadr:gadr+gdim]) if (gadr is not None and gdim>=3) else np.zeros(3)
+        if gadr is not None and gdim >= 3:
+            ww = mat.dot(sd[gadr:gadr+gdim])
+        else:
+            ww = np.zeros(3, dtype=np.float64)
         
         pos    = R_w2b.dot(pw - origin).astype(np.float32)
         linvel = R_w2b.dot(vw - vpl_w).astype(np.float32)
@@ -553,53 +626,55 @@ def compute_ref_site_kinematics(env: Any) -> Dict[str, Dict[str, np.ndarray]]:
 
 def get_site_kinematics(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
-    Retrieve non-pelvis joint-site origin positions, orientations(6D),
-    linear velocities, and angular velocities, plus qpos/qvel
-    (excluding pelvis DOFs), optionally in a yaw-only pelvis frame.
+    Retrieve kinematics for all non‐pelvis joint sites and the remaining qpos/qvel.
+
+    This function:
+      1. Builds a pelvis‐aligned frame (optional yaw only).
+      2. Preallocates buffers for site positions, orientations (6D), linear and angular velocities.
+      3. Vectorizes the MuJoCo site arrays (`site_xpos`, `site_xmat`) once outside the loop.
+      4. For each site:
+         - Computes world‐frame pw, vw, ww via matrix‐vector products.
+         - Transforms into pelvis/local frame and zeroes near‐zero noise.
+      5. Packs all site kinematics and the tail of qpos/qvel into a 1D state vector.
+      6. Builds a components dict of per‐site views and joint qpos/qvel.
 
     Parameters
     ----------
     env : Any
-        MuJoCo environment with:
-          - model, data
-          - data.site_xpos (nsite×3), data.site_xmat (nsite×9)
-          - data.sensordata, model.sensor_* arrays
+        Must provide:
+          - env.model           : mujoco.MjModel
+          - env.data            : mujoco.MjData
+          - env._joint_sites    : List of (site_id, name, (vadr,vdim), (gadr,gdim))
+          - env._pelvis_gyro    : Tuple[gadr_pel, gdim_pel]
           - env.relative_pelvis : bool
           - env.pelvis_heading  : np.ndarray shape (3,)
 
     Returns
     -------
-    joint_state : np.ndarray
-        [ all pos(3×N), all ori(9×N), all lin_vel(3×N), all ang_vel(3×N),
-          qpos[7:], qvel[6:] ]
-
+    joint_state : np.ndarray, shape=(M,)
+        Concatenated [pos(3N), orient6(6N), linvel(3N), angvel(3N), qpos_tail, qvel_tail].
     components : dict
         {
-          'joint_space_pos'   : {site_name: np.ndarray(3,)},
-          'joint_orientation' : {site_name: np.ndarray(3,2)},
-          'joint_lin_vel'     : {site_name: np.ndarray(3,)},
-          'joint_ang_vel'     : {site_name: np.ndarray(3,)},
-          'joint_qpos'        : np.ndarray,  # qpos[7:]
-          'joint_qvel'        : np.ndarray   # qvel[6:]
+          'pos'   : {name: ndarray(3,)},
+          'orient': {name: ndarray(6,)},
+          'linvel': {name: ndarray(3,)},
+          'angvel': {name: ndarray(3,)},
+          'joint_qpos': ndarray,
+          'joint_qvel': ndarray
         }
 
     Raises
     ------
     ValueError
-        If no joint-site velocimeter sensors found, or if qpos/qvel too short.
+        If qpos/qvel lengths are insufficient or sensor data misaligned.
     """
     model = env.model
     data  = env.data
     eps   = 1e-8
 
     joint_sites = env._joint_sites
-    pelvis_gyro = env._pelvis_gyro
+    gadr_pel, gdim_pel = env._pelvis_gyro
     N = len(joint_sites)
-
-    vpl_w = np.zeros(3)  # vel_pelvis_linear_inWorldFrame
-    vpa_w = np.zeros(3)
-    origin = np.zeros(3)
-    R_w2b = np.eye(3)
 
     if env.relative_pelvis:
         pelvis_bid = model.body("pelvis").id
@@ -607,94 +682,98 @@ def get_site_kinematics(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
         origin     = data.xpos[pelvis_bid].copy()
         qvel       = data.qvel
         vpl_w      = qvel[0:3].copy()
-
-        gadr, gdim = pelvis_gyro
-        if gadr is not None and gdim >= 3:
-            mat_p  = data.site_xmat[pelvis_sid].reshape(3,3)
-            raw_pg = data.sensordata[gadr:gadr+gdim]
-            vpa_w   = mat_p.dot(raw_pg)
+        
+        if gadr_pel is not None and gdim_pel >= 3:
+            mat_p = data.site_xmat[pelvis_sid].reshape(3,3)
+            raw_pg = data.sensordata[gadr_pel:gadr_pel+gdim_pel]
+            vpa_w = mat_p.dot(raw_pg)
         else:
-            vpa_w   = qvel[3:6].copy()
+            vpa_w = data.qvel[3:6].copy()
             
         xh = env.pelvis_heading
-        yh = np.array([0.0, 0.0, 1.0])
+        yh = np.array([0.0,0.0,1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
         zn = np.linalg.norm(zh)
-        if zn < eps:
-            zh = np.array([0.0, 1.0, 0.0])
-        else:
-            zh /= zn
-        xh = np.cross(yh, zh); xh /= np.linalg.norm(xh)
-        Rb    = np.stack((xh, yh, zh), axis=1)  # local→world
+        zh = zh / (zn if zn>eps else 1.0)
+        xh = np.cross(yh, zh)
+        xh /= np.linalg.norm(xh)
+        Rb    = np.stack((xh, yh, zh), axis=1)     # body→world
         R_w2b = Rb.T
-        
+    else:
+        origin = np.zeros(3, dtype=np.float64)
+        vpl_w  = np.zeros(3, dtype=np.float64)
+        vpa_w  = np.zeros(3, dtype=np.float64)
+        R_w2b  = np.eye(3, dtype=np.float64)
+    
+    site_xpos = data.site_xpos
+    site_xmat = data.site_xmat.reshape(-1,3,3)
+    sensordata = data.sensordata
+    
     # preallocate arrays
-    pos_arr     = np.empty((N, 3))
-    ori_arr     = np.empty((N, 6))
-    vel_lin_arr = np.empty((N, 3))
-    vel_ang_arr = np.empty((N, 3))
-    names       = [None] * N
+    pos_arr     = np.empty((N, 3), dtype=np.float32)
+    orient_arr  = np.empty((N, 6), dtype=np.float32)
+    linvel_arr  = np.empty((N, 3), dtype=np.float32)
+    angvel_arr  = np.empty((N, 3), dtype=np.float32)
+    names       = [None]*N
     
     # fill kinematics
     for i, (sid, name, (vadr, vdim), (gadr, gdim)) in enumerate(joint_sites):
         names[i] = name
 
-        pw  = data.site_xpos[sid]
-        mat = data.site_xmat[sid].reshape(3, 3)
-        raw_v = data.sensordata[vadr:vadr+vdim]
-        vw    = mat.dot(raw_v)
-        if gadr is not None and gdim >= 3:
-            raw_w = data.sensordata[gadr:gadr+gdim]
-            ww    = mat.dot(raw_w)
+        mat = site_xmat[sid]
+        pw  = site_xpos[sid]
+        vw  = mat.dot(sensordata[vadr:vadr+vdim])
+        if gadr is not None and gdim>=3:
+            ww = mat.dot(sensordata[gadr:gadr+gdim])
         else:
-            ww    = np.zeros(3)
+            ww = np.zeros(3, dtype=np.float64)
 
-        v_rel = vw - vpl_w
-        w_rel = ww - vpa_w
-        vel_lin_arr[i] = R_w2b.dot(v_rel)
-        vel_ang_arr[i] = R_w2b.dot(w_rel)
+        p_loc = R_w2b.dot(pw - origin)
+        v_loc = R_w2b.dot(vw - vpl_w)
+        w_loc = R_w2b.dot(ww - vpa_w)
         
-        pos_arr[i] = R_w2b.dot(pw - origin)
-        ori_arr[i] = R_w2b.dot(mat).ravel()[:6]
+        ori6 = R_w2b.dot(mat).ravel()[:6]
         
-        pos_arr[i][np.abs(pos_arr[i]) < eps]       = 0.0
-        vel_lin_arr[i][np.abs(vel_lin_arr[i]) < eps] = 0.0
-        vel_ang_arr[i][np.abs(vel_ang_arr[i]) < eps] = 0.0
+        p_loc[np.abs(p_loc) < eps] = 0.0
+        v_loc[np.abs(v_loc) < eps] = 0.0
+        w_loc[np.abs(w_loc) < eps] = 0.0
+        ori6[np.abs(ori6) < eps] = 0.0
+        
+        pos_arr[i]    = p_loc.astype(np.float32)
+        linvel_arr[i] = v_loc.astype(np.float32)
+        angvel_arr[i] = w_loc.astype(np.float32)
+        orient_arr[i] = ori6.astype(np.float32)
 
     qpos = data.qpos; qvel = data.qvel
     if qpos.size <= 7 or qvel.size <= 6:
         raise ValueError("qpos/qvel too short to exclude pelvis DOFs.")
-    qpj = qpos[7:].copy()
-    qvj = qvel[6:].copy()
+    qpj = qpos[7:].astype(np.float32, copy=True)
+    qvj = qvel[6:].astype(np.float32, copy=True)
 
-    total_len   = (3 + 6 + 3 + 3) * N + qpj.size + qvj.size
-    joint_state = np.empty(total_len, dtype=float)
+    L = 3*N + 6*N + 3*N + 3*N
+    joint_state = np.empty(L + qpj.size + qvj.size, dtype=np.float32)
     off = 0
-    joint_state[off:off + 3*N] = pos_arr.ravel()
-    off += 3*N
-    joint_state[off:off + 6*N] = ori_arr.ravel()
-    off += 6*N
-    joint_state[off:off + 3*N] = vel_lin_arr.ravel()
-    off += 3*N
-    joint_state[off:off + 3*N] = vel_ang_arr.ravel()
-    off += 3*N
-    joint_state[off:off + qpj.size] = qpj
-    off += qpj.size
-    joint_state[off:off + qvj.size] = qvj
+    joint_state[off:off+3*N]       = pos_arr.ravel();    off += 3*N
+    joint_state[off:off+6*N]       = orient_arr.ravel(); off += 6*N
+    joint_state[off:off+3*N]       = linvel_arr.ravel(); off += 3*N
+    joint_state[off:off+3*N]       = angvel_arr.ravel(); off += 3*N
+    joint_state[off:off+qpj.size]  = qpj;                off += qpj.size
+    joint_state[off:off+qvj.size]  = qvj
 
+    # --- Prepare components dict ---
     components: Dict[str, Any] = {
-        'pos'   : {},
-        'orient' : {},
-        'linvel'     : {},
-        'angvel'     : {},
-        'joint_qpos'        : qpj,
-        'joint_qvel'        : qvj
+        'pos':   {},
+        'orient':{},
+        'linvel':{},
+        'angvel':{},
+        'joint_qpos': qpj,
+        'joint_qvel': qvj
     }
-    for i, nm in enumerate(names):
-        components['pos'][nm]   = pos_arr[i].copy()
-        components['orient'][nm] = ori_arr[i].copy()
-        components['linvel'][nm]     = vel_lin_arr[i].copy()
-        components['angvel'][nm]     = vel_ang_arr[i].copy()
+    for i, name in enumerate(names):
+        components['pos'][name]    = pos_arr[i]
+        components['orient'][name] = orient_arr[i]
+        components['linvel'][name] = linvel_arr[i]
+        components['angvel'][name] = angvel_arr[i]
 
     return joint_state, components
 
@@ -705,42 +784,48 @@ def get_traj_info(
     """
     Retrieve future reference-trajectory joint positions and velocities.
 
+    Given the current frame in env.ref_traj, this returns the qpos and qvel
+    at one or more future offsets, packed both as a flat state vector and
+    as separate arrays for positions and velocities.
+
     Parameters
     ----------
     env : Any
-        Environment instance with a `ref_traj` attribute of type `ReferenceTrajectories`.
-        Must have, after reset():
-          - env.ref_traj.qpos : 2D np.ndarray, shape (n_dofs, traj_frames)
-          - env.ref_traj.qvel : 2D np.ndarray, shape (n_dofs, traj_frames)
-          - env.ref_traj._pos : int, current frame index
-          - env.ref_traj.increment : int, frame step per call
-          - env.ref_traj.traj_frames : int, total number of frames in trajectory
-
-    horizon : int or list[int], optional
-        One or more frame-offsets ahead of the current frame:
-          - If None, defaults to [1].
-          - If int, fetches that many increments ahead.
-          - If list of ints, fetches each listed offset.
-        Offsets must be ≥ 0.
+        Environment with attribute `ref_traj` of type ReferenceTrajectories,
+        which after reset() must provide:
+          - ref_traj.qpos          : ndarray, shape (n_dofs, traj_frames)
+          - ref_traj.qvel          : ndarray, shape (n_dofs, traj_frames)
+          - ref_traj._pos          : int, current frame index
+          - ref_traj.increment     : int, frames to advance per offset unit
+          - ref_traj.traj_frames   : int, total frames in the trajectory
+    horizon : int or list of int, optional
+        Frame‐offsets ahead of the current frame to sample. If:
+          - None: defaults to [1]
+          - int: treated as [horizon]
+          - list of ints: treated as that list
+        Offsets may be zero or positive. They wrap around via modulo the
+        trajectory length.
 
     Returns
     -------
-    future_state : np.ndarray, shape=((qpos + qvel) * m,)
-
+    future_state : np.ndarray, shape=((n_dofs*len(horizon))*2,)
+        Concatenation of future_qpos.ravel() followed by future_qvel.ravel().
     components : dict
         {
-          'future_qpos': np.ndarray, shape=(qpos, m),
-          'future_qvel': np.ndarray, shape=(qvel, m)
+          'future_qpos': ndarray, shape (n_dofs, m),
+          'future_qvel': ndarray, shape (n_dofs, m)
         }
+        where m = number of horizon offsets.
 
     Raises
     ------
     ValueError
-        If ref_traj missing or mis-shaped, or horizon invalid.
+        If ref_traj is missing or misconfigured, or if horizon is invalid.
     """
     if not hasattr(env, "ref_traj"):
         raise ValueError("Environment has no attribute 'ref_traj'.")
     ref = env.ref_traj
+    
     try:
         qpos_all = ref.qpos
         qvel_all = ref.qvel
@@ -759,65 +844,74 @@ def get_traj_info(
         raise ValueError(f"qpos/qvel second dimension must equal traj_frames ({total}); got {N1}, {N2}")
 
     if horizon is None:
-        offsets = [1]
+        offsets = np.array([1, 2], dtype=int)
     elif isinstance(horizon, int):
-        offsets = [horizon]
-    elif isinstance(horizon, list) and all(isinstance(x, int) for x in horizon):
-        offsets = horizon
+        offsets = np.array([horizon], dtype=int)
+    elif isinstance(horizon, (list, tuple)):
+        if not all(isinstance(x, int) and x >= 0 for x in horizon):
+            raise ValueError("All horizon offsets must be non-negative integers")
+        offsets = np.array(horizon, dtype=int)
     else:
-        raise ValueError("`horizon` must be None, int, or list of ints.")
-    if any(off < 0 for off in offsets):
-        raise ValueError("All horizon offsets must be non-negative.")
+        raise ValueError("`horizon` must be None, int, or list/tuple of ints")
 
-    offs_arr = np.array(offsets, dtype=int)
-    idxs = (current + offs_arr * incr) % total
+    idxs = (current + offsets * incr) % total  # shape (m,)
     m = idxs.size
-    future_qpos = np.take(qpos_all, idxs, axis=1)
-    future_qvel = np.take(qvel_all, idxs, axis=1)
+
+    future_qpos = np.take(qpos_all, idxs, axis=1)  # (n_dofs, m)
+    future_qvel = np.take(qvel_all, idxs, axis=1)  # (n_dofs, m)
 
     len_pos = n_qpos * m
     len_vel = n_qvel * m
     future_state = np.empty(len_pos + len_vel, dtype=qpos_all.dtype)
-    future_state[:len_pos]       = future_qpos.ravel(order='C')
-    future_state[len_pos:]       = future_qvel.ravel(order='C')
+    
+    future_state[0:len_pos]             = future_qpos.ravel(order='C')
+    future_state[len_pos:len_pos+len_vel] = future_qvel.ravel(order='C')
 
     components = {
-        'future_qpos': future_qpos,
-        'future_qvel': future_qvel
+        "future_qpos": future_qpos,
+        "future_qvel": future_qvel
     }
     return future_state, components
 
-def get_COM_kinematics(env: any) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+def get_COM_kinematics(
+        env: any
+        ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
     """
-    Compute the overall Center-of-Mass (COM) position and velocity of the model.
+    Compute the model’s center-of-mass (COM) position and velocity.
+
+    This function weights each body’s subtree COM and spatial velocity
+    by its mass to yield the overall COM kinematics. Optionally expresses
+    results in a pelvis-aligned frame.
 
     Parameters
     ----------
     env : Any
-        MuJoCo environment with:
-          - env.data.subtree_com : (n_bodies,3) array
-          - env.data.cvel        : (n_bodies,6) array
-          - env.model.body_mass  : (n_bodies,) array
-          - env.data.xpos        : (n_bodies,3) array
-          - env.data.qvel        : (ndof,) array
-          - env.relative_pelvis  : bool
-          - env.pelvis_heading   : property returning unit (x,y,z) pelvis X‐axis proj
+        Must provide:
+          - env.model           : mujoco.MjModel
+          - env.data            : mujoco.MjData with fields:
+                * subtree_com    : ndarray, shape (n_bodies, 3)
+                * cvel           : ndarray, shape (n_bodies, 6),
+                                    columns [ωx,ωy,ωz, vx,vy,vz]
+                * xpos           : ndarray, shape (n_bodies, 3)
+          - env.relative_pelvis : bool
+          - env.pelvis_heading  : ndarray, shape (3,)
 
     Returns
     -------
-    com_state : np.ndarray, shape=(6,) 
-        [com_pos_x, com_pos_y, com_pos_z, com_vel_x, com_vel_y, com_vel_z]
-        Or if relative_pelvis=True, the same in the pelvis frame.
+    com_state : ndarray, shape (6,)
+        [com_pos_x, com_pos_y, com_pos_z, com_vel_x, com_vel_y, com_vel_z].
+        If `env.relative_pelvis` is True, values are in the pelvis frame.
+
     components : dict
         {
-          'com_pos': np.ndarray, shape=(3,),
-          'com_vel': np.ndarray, shape=(3,)
+          "com_pos": ndarray shape (3,),
+          "com_vel": ndarray shape (3,)
         }
 
     Raises
     ------
     ValueError
-        On missing attributes or unexpected shapes.
+        If required data are missing or have unexpected shapes, or total mass ≤ 0.
     """
     model = env.model
     data = env.data
@@ -830,13 +924,17 @@ def get_COM_kinematics(env: any) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
     if com_pos_world.shape != (3,):
         raise ValueError(f"data.subtree_com[0] must be shape (3,), got {com_pos_world.shape}")
     
-    if not hasattr(env, "_com_masses"):
-        masses = np.asarray(model.body_mass[1:], dtype=float)
-        if masses.ndim != 1 or masses.size == 0:
+    masses = getattr(env, "_com_masses", None)
+    if masses is None:
+        body_mass = np.asarray(model.body_mass, dtype=np.float64)
+        if body_mass.ndim != 1 or body_mass.size < 2:
             raise ValueError(f"Unexpected model.body_mass shape: {model.body_mass.shape}")
+        # skip world body at index 0
+        masses = body_mass[1:]
         env._com_masses = masses
-    else:
-        masses = env._com_masses
+    total_mass = float(masses.sum())
+    if total_mass <= 0:
+        raise ValueError(f"Nonpositive total mass: {total_mass}")
         
     try:
         cvel = data.cvel[1:, 3:6]
@@ -844,40 +942,37 @@ def get_COM_kinematics(env: any) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
         raise ValueError(f"Failed to read data.cvel: {e}")
     if cvel.shape[0] != masses.size or cvel.shape[1] != 3:
         raise ValueError(f"data.cvel[1:,3:6] shape {cvel.shape} mismatches masses {masses.shape}")
-    total_mass = masses.sum()  # recomputed each call
-    if total_mass <= 0:
-        raise ValueError(f"Nonpositive total mass: {total_mass}")
+    
     com_vel_world = (cvel * masses[:, None]).sum(axis=0) / total_mass
     
     if getattr(env, "relative_pelvis", False):
-        pelvis_id = model.body("pelvis").id
-        origin    = data.xpos[pelvis_id]
-        vpl_w     = data.qvel[:3]
+        pid    = model.body("pelvis").id
+        origin = data.xpos[pid]
+        vpl_w  = data.qvel[0:3] 
 
-        xh = env.pelvis_heading
-        yh = np.array([0.0, 0.0, 1.0], dtype=float)
+        xh = env.pelvis_heading.astype(np.float64)
+        yh = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
         zn = np.linalg.norm(zh)
-        if zn < 1e-8:
-            zh = np.array([0.0, 1.0, 0.0], dtype=float)
-        else:
-            zh /= zn
-        xh = np.cross(yh, zh); xh /= np.linalg.norm(xh)
+        zh = zh / (zn if zn>1e-8 else 1.0)
+        xh = np.cross(yh, zh)
+        xh /= np.linalg.norm(xh)
         R_basis = np.stack([xh, yh, zh], axis=1)
         R_w2b   = R_basis.T
 
-        pos_rel_world = com_pos_world - origin
-        vel_rel_world = com_vel_world - vpl_w
-        com_pos = R_w2b.dot(pos_rel_world)
-        com_vel = R_w2b.dot(vel_rel_world)
+        pos_local = R_w2b.dot(com_pos_world - origin)
+        vel_local = R_w2b.dot(com_vel_world - vpl_w)
     else:
-        com_pos = com_pos_world.copy()
-        com_vel = com_vel_world.copy()
+        pos_local = com_pos_world.copy()
+        vel_local = com_vel_world.copy()
 
-    com_state  = np.concatenate([com_pos, com_vel])
+    com_state = np.empty(6, dtype=np.float64)
+    com_state[0:3] = pos_local
+    com_state[3:6] = vel_local
+
     components = {
-        "com_pos": com_pos.copy(),
-        "com_vel": com_vel.copy()
+        "com_pos": pos_local.copy(),
+        "com_vel": vel_local.copy()
     }
     return com_state, components
     
@@ -895,83 +990,103 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     Parameters
     ----------
     env : Any
-        
+        Must provide the following functions/attributes:
+          - get_pelvis_kinematics(env, use_free_joint=True)
+          - get_site_kinematics(env)
+          - get_COM_kinematics(env)
+          - get_GRF_info(env)
+          - compute_foot_contacts(grf_comp, threshold)
+          - get_traj_info(env)
+          - env.contact_threshold : float (optional)
+
     Returns
     -------
     state : np.ndarray, shape=(M,)
-        Concatenation of all sub-states and contacts.
+        Flat vector concatenating all sub-states in the order above.
     components : dict
         {
-          'pelvis': dict,         # from get_pelvis_kinematics
-          'joint': dict,          # from get_joint_kinematics
-          'com': dict,            # from get_COM_kinematics
-          'grf': dict,            # from get_GRF_info
-          'foot_contacts': np.ndarray(shape=(2,))
-          'traj': dict,           # from get_traj_info
+          'pelvis'        : dict,      # from get_pelvis_kinematics
+          'joint'         : dict,      # from get_site_kinematics
+          'com'           : dict,      # from get_COM_kinematics
+          'grf'           : dict,      # from get_GRF_info
+          'foot_contacts' : np.ndarray,# shape=(2,)
+          'traj'          : dict       # from get_traj_info
         }
 
     Raises
     ------
     ValueError
-        If any sub-state extraction or concatenation fails.
+        If any sub-state extraction fails.
     """
-    # Extract sub-states
+    gp = get_pelvis_kinematics
+    gs = get_site_kinematics
+    gc = get_COM_kinematics
+    gg = get_GRF_info
+    cf = compute_foot_contacts
+    gt = get_traj_info
+
+    # 1) Pelvis
     try:
-        pelvis_state, pelvis_comp = get_pelvis_kinematics(env, use_free_joint=True)
+        pelvis_state, pelvis_comp = gp(env, use_free_joint=True)
     except Exception as e:
         raise ValueError(f"get_pelvis_kinematics failed: {e}")
-    
+
+    # 2) Joint sites
     try:
-        joint_state, joint_comp = get_site_kinematics(env)
+        joint_state, joint_comp = gs(env)
     except Exception as e:
-        raise ValueError(f"get_joint_kinematics failed: {e}")
-        
+        raise ValueError(f"get_site_kinematics failed: {e}")
+
+    # 3) COM
     try:
-        com_state, com_comp = get_COM_kinematics(env)
+        com_state, com_comp = gc(env)
     except Exception as e:
-        raise ValueError(f"get_joint_kinematics failed: {e}")
-    
+        raise ValueError(f"get_COM_kinematics failed: {e}")
+
+    # 4) GRF
     try:
-        grf_state, grf_comp = get_GRF_info(env)
+        grf_state, grf_comp = gg(env)
     except Exception as e:
         raise ValueError(f"get_GRF_info failed: {e}")
-        
-    thresh = getattr(env, 'contact_threshold', 1e-2)
+
+    # 5) Foot contacts
+    threshold = getattr(env, "contact_threshold", 1e-2)
     try:
-        foot_contacts = compute_foot_contacts(grf_comp, thresh)
+        foot_contacts = cf(grf_comp, threshold)
     except Exception as e:
         raise ValueError(f"compute_foot_contacts failed: {e}")
-    
+
+    # 6) Future trajectory
     try:
-        future_state, future_comp = get_traj_info(env)
+        future_state, future_comp = gt(env)
     except Exception as e:
         raise ValueError(f"get_traj_info failed: {e}")
-    
-    # Precompute segment lengths
-    L_p   = pelvis_state.size
-    L_j   = joint_state.size
-    L_com = com_state.size
-    L_g   = grf_state.size
-    L_ct  = foot_contacts.size  # ==2
-    L_t   = future_state.size
-    total_len = L_p + L_j + L_com + L_g + L_ct + L_t
-    
+
+    # --- Concatenate into one flat state vector ---
+    sub_states: List[np.ndarray] = [
+        pelvis_state,
+        joint_state,
+        com_state,
+        grf_state,
+        foot_contacts,
+        future_state
+    ]
+
+    # Compute total length
+    total_len = sum(s.size for s in sub_states)
+
+    # Preallocate
     state = np.empty(total_len, dtype=pelvis_state.dtype)
+
+    # Fill in order
     idx = 0
-    state[idx:idx + L_p] = pelvis_state
-    idx += L_p
-    state[idx:idx + L_j] = joint_state
-    idx += L_j
-    state[idx:idx + L_com] = com_state
-    idx += L_com
-    state[idx:idx + L_g] = grf_state
-    idx += L_g
-    state[idx:idx + L_ct] = foot_contacts
-    idx += L_ct
-    state[idx:idx + L_t] = future_state
-    
-    
-    components = {
+    for arr in sub_states:
+        length = arr.size
+        state[idx : idx + length] = arr.ravel(order='C')
+        idx += length
+
+    # Package components
+    components: Dict[str, Any] = {
         'pelvis':        pelvis_comp,
         'joint':         joint_comp,
         'com':           com_comp,
@@ -1107,5 +1222,4 @@ def get_state_extend(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
 def get_state_extend_size(env: Any) -> int:
     pass
     
-
 # foot slip velocity

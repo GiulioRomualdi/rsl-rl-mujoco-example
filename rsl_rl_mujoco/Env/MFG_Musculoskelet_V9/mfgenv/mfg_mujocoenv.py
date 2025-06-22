@@ -214,6 +214,12 @@ class MuJoCoEnv(BaseEnv):
                     self.data,
                     key_callback=self.key_callback
                 )
+                self.viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+                self.viewer.cam.trackbodyid = 1
+                self.viewer.cam.fixedcamid = -1
+                self.viewer.cam.distance  = 5      
+                self.viewer.cam.azimuth   = 135.0
+                self.viewer.cam.elevation = -20.0
             except Exception as e:
                 raise RuntimeError(f"Failed to launch human-mode viewer: {e}")
         elif self.render_mode == "rgb_array":

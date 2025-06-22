@@ -7,9 +7,9 @@ import numpy as np
 from gymnasium import spaces
 
 from .mfg_mujocoenv import MuJoCoEnv
-from .ReferTraj_V6 import TrajectoryManager, ReferenceTrajectories, get_global_trajectory_manager
+from .ReferTraj_V7 import TrajectoryManager, ReferenceTrajectories
 from .common_utils import calculate_frameskip, convert_ref_traj_qpos, convert_ref_traj_qvel
-from .state import get_state, get_state_size
+from .state import get_state, get_state_size, compute_ref_site_kinematics, compute_ref_pelvis_kinematics
 from .reward import compute_reward
 from .termination import check_termination
 
@@ -341,7 +341,7 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         if not hasattr(self, 'ref_traj') or self.ref_traj is None:
             raise ValueError("Reference trajectory object is not initialized.")
 
-        ref_qpos, ref_qvel = self.ref_traj.get_extend_refer()
+        ref_qpos, ref_qvel = self.ref_traj.get_reference_trajectories()
         if ref_qpos is None or ref_qvel is None:
             raise ValueError("Failed to retrieve reference trajectories.")
         
@@ -352,6 +352,8 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         self,
         *,
         seed: Optional[int] = None,
+        traj_id: Optional[int] = None,
+        frame: Optional[int] = None,
         options: Optional[Dict[str, Any]] = None
         ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset environment state, reference cursor, phase, frame_skip, and history.
@@ -386,7 +388,15 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         if seed is not None:
             self._seed(seed)
         
-        self.ref_traj.reset(seed=seed, phase=None, randomize_traj=True)
+        self.ref_traj.reset(
+            seed=seed,
+            phase=None,
+            randomize_traj=(traj_id is None),
+            traj_id=traj_id
+            )
+        if frame is not None:
+            self.ref_traj._pos = frame
+            self.ref_traj._has_reached_end = (frame >= self.ref_traj.traj_frames - 1)
         self._update_traj_init_info()
         
         reset_opts = {} if options is None else options.copy()
@@ -448,38 +458,46 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         """
         obs, _, _, _, info = super().step(action)
         
-        # Advance reference cursor and increase time
+        comp = info["obs_components"]
+        sim_joint = comp["joint"]
+        sim_pel   = comp["pelvis"]
+        if sim_joint is None or sim_pel is None:
+            raise KeyError("info['obs_components'] must contain keys 'joint' and 'pelvis'")
+        
         self.ref_traj.next()
         self.step_count += 1
         sim_time = self.step_count * self.opt_time * self.frame_skip
         
-        # FSM transition: IMITATION → REACH_GOAL
-        if self.enable_reach_goal and self.phase == EnvPhase.IMITATION:
-            if self.ref_traj.has_reached_end:
-                self.phase = EnvPhase.REACH_GOAL
-                
-                self._next_goal_update = sim_time + self.goal_switch_interval
-                self.logger.debug("Switched to REACH_GOAL phase at sim_time=%.3f s", sim_time)
+        ref_kin = compute_ref_site_kinematics(self)
+        ref_pel = compute_ref_pelvis_kinematics(self, use_free_joint=True)
         
-        # Update dynamic goal at intervals if enabled
-        if self.enable_reach_goal and self.phase == EnvPhase.REACH_GOAL:
-            if sim_time >= self._next_goal_update:
+        comp_trim = {
+            "joint":   sim_joint,
+            "pelvis":  sim_pel,
+            "ref_kin": ref_kin,
+            "ref_pel": ref_pel
+        }
+        
+        # FSM transition: IMITATION → REACH_GOAL
+        if self.enable_reach_goal:
+            if (self.phase is EnvPhase.IMITATION and
+                self.ref_traj.has_reached_end):
+                self.phase = EnvPhase.REACH_GOAL
+                self._next_goal_update = sim_time + self.goal_switch_interval
+            if (self.phase is EnvPhase.REACH_GOAL and
+                sim_time >= self._next_goal_update):
                 self.goal_pos = self._sample_goal_position()
                 self._next_goal_update += self.goal_switch_interval
-                self.logger.debug(
-                    "REACH_GOAL: new goal_pos=%s at t=%.3f s; next update at %.3f s",
-                    self.goal_pos, sim_time, self._next_goal_update
-                )
         
-        # Compute rewards & terminations
-        total_reward, reward_info = compute_reward(self, info["obs_components"])
-        terminated, term_info = check_termination(self, conditions=["has_fallen", "site_deviation_exceeded"])
-        at_max_steps = (self.step_count >= self.max_episode_steps)
-        if not self.enable_reach_goal:
-            truncated = self.ref_traj.has_reached_end or at_max_steps
+        total_reward, reward_info = compute_reward(self, comp_trim)
+        terminated, term_info = check_termination(self, obs_components=comp_trim, conditions=["has_fallen", "site_deviation_exceeded"])
+        
+        at_max = (self.step_count >= self.max_episode_steps)
+        if self.enable_reach_goal:
+            truncated = at_max
         else:
-            truncated = at_max_steps
-            
+            truncated = self.ref_traj.has_reached_end or at_max
+
         if self.enable_history:
             self._update_history_buffer(action, obs)
             
@@ -496,9 +514,10 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
             info["long_history"]  = list(self.long_history)
             
         self.logger.debug(
-                "Step %d | reward=%.4f | terminated=%s | truncated=%s",
-                self.step_count, total_reward, terminated, truncated
-            )
+            "Step %d | reward=%.4f | term=%s | trunc=%s",
+            self.step_count, total_reward, terminated, truncated
+        )
+
         return obs, total_reward, terminated, truncated, info
     
     def _sample_goal_position(self) -> np.ndarray:

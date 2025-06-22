@@ -12,7 +12,7 @@ import mujoco
 import mujoco.viewer as viewer
 from scipy.spatial.transform import Rotation as R
 import logging
-from typing import Any, List, Tuple, Union, Optional, Dict
+from typing import Any, List, Tuple, Union, Optional, Dict, Sequence
 import quaternion
 
 # Module-level logger configuration.
@@ -23,31 +23,34 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     
-def validate_file(file_path: Union[str, Path], description: str) -> None:
+def validate_file(
+        file_path: Union[str, Path], 
+        description: str
+        ) -> None:
     """
-    Ensure that a given path exists and refers to a regular file.
+    Ensure that `file_path` exists and is a regular file.
 
     Parameters
     ----------
-    file_path : str or pathlib.Path
-        Path to the file to validate. May be a string or Path object.
+    file_path : str or os.PathLike
+        Path to validate.
     description : str
-        Human-readable description of the file, used in error messages.
+        Human-readable name of the file, for error messages.
 
     Raises
     ------
     TypeError
-        If 'file_path' is not a str or Path, or if 'description' is not a str.
+        If `file_path` is not a str/PathLike or `description` is not a str.
     FileNotFoundError
-        If the path does not exist or is not a file.
+        If the path does not exist or is not a regular file.
     """
     if not isinstance(description, str):
         raise TypeError(f"description must be a str, got {type(description).__name__}")
-    if not isinstance(file_path, (str, Path)):
-        raise TypeError(f"file_path must be a str or Path, got {type(file_path).__name__}")
+    if not isinstance(file_path, (str, os.PathLike)):
+        raise TypeError(f"file_path must be str or PathLike, got {type(file_path).__name__}")
 
     p = Path(file_path).expanduser().resolve()
-    logger.debug("Validating %s at path: %s", description, p)
+    logger.debug("Validating %s at %s", description, p)
 
     if not p.exists():
         raise FileNotFoundError(f"{description} does not exist at: {p}")
@@ -56,293 +59,422 @@ def validate_file(file_path: Union[str, Path], description: str) -> None:
 
 def orient6_to_mat(o6: np.ndarray) -> np.ndarray:
     """
-    Re-construct the Rotation matrix from 6D array.
+    Convert a 6D orientation vector into a 3×3 rotation matrix.
+
+    The first three elements are the first column, the next three the second;
+    the third column is computed via cross product, and all columns are
+    orthonormalized.
+
+    Parameters
+    ----------
+    o6 : np.ndarray, shape (6,)
+        6D orientation representation.
+
+    Returns
+    -------
+    np.ndarray, shape (3,3)
+        Orthonormal rotation matrix.
+
+    Raises
+    ------
+    ValueError
+        If input is not length 6 or contains zero-length vectors.
     """
-    r1 = o6[0:3]
-    r2 = o6[3:6]
+    o6 = np.asarray(o6, dtype=np.float64)
+    if o6.ndim != 1 or o6.size != 6:
+        raise ValueError(f"orient6_to_mat requires a 6-element vector, got shape {o6.shape}")
+    
+    r1 = o6[0:3].copy()
+    r2 = o6[3:6].copy()
+
+    n1 = np.linalg.norm(r1)
+    r1 = r1 / (n1 if n1>1e-8 else 1.0)
+    
     r3 = np.cross(r1, r2)
-    r1 = r1 / np.linalg.norm(r1)
-    r3 = r3 / np.linalg.norm(r3)
+    n3 = np.linalg.norm(r3)
+    r3 = r3 / (n3 if n3>1e-8 else 1.0)
     r2 = np.cross(r3, r1)
     return np.stack([r1, r2, r3], axis=0)  # shape (3,3)
 
 def quat_to_mat(q: np.ndarray) -> np.ndarray:
     """
-    quaternion to rotation matrix
+    Convert a unit quaternion (w, x, y, z) to a 3×3 rotation matrix.
+
+    Parameters
+    ----------
+    q : np.ndarray, shape (4,)
+        Quaternion in (w, x, y, z) order.
+
+    Returns
+    -------
+    np.ndarray, shape (3,3)
+        Rotation matrix.
+
+    Raises
+    ------
+    ValueError
+        If input is not length 4 or has near-zero norm.
     """
-    w,x,y,z = q
+    q = np.asarray(q, dtype=np.float64)
+    if q.ndim != 1 or q.size != 4:
+        raise ValueError(f"quat_to_mat requires a 4-element vector, got shape {q.shape}")
+
+    w, x, y, z = q
+    norm = math.hypot(w, x, y, z)
+    if norm < 1e-12:
+        raise ValueError("Quaternion has near-zero norm")
+
+    w, x, y, z = w/norm, x/norm, y/norm, z/norm
+    ww = w*w; xx = x*x; yy = y*y; zz = z*z
+    wx = w*x; wy = w*y; wz = w*z
+    xy = x*y; xz = x*z; yz = y*z
+
     return np.array([
-        [1-2*y*y-2*z*z,   2*x*y-2*w*z,   2*x*z+2*w*y],
-        [2*x*y+2*w*z,   1-2*x*x-2*z*z,   2*y*z-2*w*x],
-        [2*x*z-2*w*y,     2*y*z+2*w*x, 1-2*x*x-2*y*y]
-    ])
+        [ ww + xx - yy - zz,  2*(xy - wz),      2*(xz + wy)    ],
+        [ 2*(xy + wz),        ww - xx + yy - zz,2*(yz - wx)    ],
+        [ 2*(xz - wy),        2*(yz + wx),      ww - xx - yy + zz]
+    ], dtype=np.float64)
 
 def rotation_geodesic(R1: np.ndarray, R2: np.ndarray) -> float:
     """
-    Calculate the geodesic distance between 2 rotation matrix 
-    trace(R1ᵀ R2) = 1 + 2 cos(theta)  ⇒  theta = acos((trace -1)/2)
+    Compute the geodesic angle between two rotation matrices.
+
+    Given R = R1ᵀ R2, the rotation angle θ satisfies:
+        trace(R) = 1 + 2 cos θ
+        θ = arccos((trace(R)-1)/2)
+
+    Parameters
+    ----------
+    R1, R2 : np.ndarray, shape (3,3)
+        Rotation matrices.
+
+    Returns
+    -------
+    float
+        Geodesic distance in radians ∈ [0, π].
+
+    Raises
+    ------
+    ValueError
+        If inputs are not 3×3 matrices.
     """
-    R = R1.T.dot(R2)
-    tr = (np.trace(R) - 1) / 2
+    R1 = np.asarray(R1, dtype=np.float64)
+    R2 = np.asarray(R2, dtype=np.float64)
+    if R1.shape != (3,3) or R2.shape != (3,3):
+        raise ValueError(f"rotation_geodesic requires two 3×3 matrices, got {R1.shape}, {R2.shape}")
+
+    R = R1.T @ R2
+    tr = (np.trace(R) - 1.0) / 2.0
     tr = max(-1.0, min(1.0, tr))
     return math.acos(tr)
         
-def add_noise(data: np.ndarray,
-              noise_std: float = 2e-3,
-              noise_type: str = 'gaussian',
-              rng: np.random.Generator = None) -> np.ndarray:
+def add_noise(
+        data: np.ndarray,
+        noise_std: float = 2e-3,
+        noise_type: str = 'gaussian',
+        rng: np.random.Generator = None
+        ) -> np.ndarray:
     """
-    Add random noise to an array to improve robustness.
+    Add random noise to an array, elementwise.
 
     Parameters
     ----------
     data : np.ndarray
-        Input array of arbitrary shape.
+        Input data array.
     noise_std : float, optional
-        Noise scale parameter. For 'gaussian', this is the standard deviation;
-        for 'uniform', this is the half‐range. Must be non‐negative.
-        Default is 2e-3.
-    noise_type : {'gaussian', 'uniform'}, optional
-        Type of noise distribution to use:
-        - 'gaussian': samples from N(0, noise_std^2)
-        - 'uniform': samples from U(-noise_std, noise_std)
-        Default is 'gaussian'.
-    rng : numpy.random.Generator, optional
-        NumPy random number generator for reproducibility. If None, a new Generator
-        will be created via 'default_rng()'.
+        Scale parameter (σ for Gaussian, half-range for uniform). Must be ≥ 0.
+    noise_type : {'gaussian','uniform'}, optional
+        Distribution of noise:
+          - 'gaussian': N(0, σ²)
+          - 'uniform': U(-σ, σ)
+    rng : np.random.Generator, optional
+        Random number generator. If None, a new default_rng() is used.
 
     Returns
     -------
     np.ndarray
-        A new array with the same shape as 'data', with noise added.
+        Noisy array of the same shape and dtype as `data`.
 
     Raises
     ------
     TypeError
-        If 'data' is not a numpy ndarray, or if 'noise_std' is not a float,
-        or if 'rng' is provided but is not a numpy.random.Generator.
+        If `data` is not a numpy.ndarray or `rng` is not a Generator.
     ValueError
-        If 'noise_std' is negative, or if 'noise_type' is not one of
-        'gaussian' or 'uniform'.
+        If `noise_std` < 0 or `noise_type` invalid.
     """
     if not isinstance(data, np.ndarray):
-        raise TypeError(f"data must be a numpy ndarray, got {type(data).__name__}")
-    if not isinstance(noise_std, (float, int)):
-        raise TypeError(f"noise_std must be a float or int, got {type(noise_std).__name__}")
+        raise TypeError(f"data must be np.ndarray, got {type(data).__name__}")
+    if not isinstance(noise_std, (int, float)):
+        raise TypeError(f"noise_std must be numeric, got {type(noise_std).__name__}")
     noise_std = float(noise_std)
-    if noise_std < 0:
+    if noise_std < 0.0:
         raise ValueError(f"noise_std must be non-negative, got {noise_std}")
 
     if rng is None:
         rng = np.random.default_rng()
     elif not isinstance(rng, np.random.Generator):
-        raise TypeError(f"rng must be a numpy.random.Generator, got {type(rng).__name__}")
+        raise TypeError(f"rng must be numpy.random.Generator, got {type(rng).__name__}")
 
-    noise_type = noise_type.lower()
-    if noise_type == 'gaussian':
-        noise = rng.normal(loc=0.0, scale=noise_std, size=data.shape)
-    elif noise_type == 'uniform':
-        noise = rng.uniform(low=-noise_std, high=noise_std, size=data.shape)
+    nt = noise_type.lower()
+    if nt == 'gaussian':
+        noise = rng.standard_normal(size=data.shape) * noise_std
+    elif nt == 'uniform':
+        noise = rng.uniform(-noise_std, noise_std, size=data.shape)
     else:
         raise ValueError(f"noise_type must be 'gaussian' or 'uniform', got '{noise_type}'")
 
-    return data + noise
+    # Preserve input dtype, avoid unnecessary copy if possible
+    return (data + noise).astype(data.dtype, copy=False)
 
-def calculate_frameskip(env: Any, tolerance: float = 1e-8) -> int:
+def calculate_frameskip(
+        env: Any, 
+        tolerance: float = 1e-8
+        ) -> int:
     """
-    Compute how many MuJoCo simulation steps to take per environment step.
+    Determine the integer number of MuJoCo steps to take per environment step.
 
-    The frame skip is given by:
+    The frame skip is computed as:
 
-        frame_skip = ref_traj.increment / (opt_time * ref_traj.sample_frequency)
+        raw_skip = ref_traj.increment / (opt_time * ref_traj.sample_frequency)
+
+    and must be an integer within a specified tolerance.
 
     Parameters
     ----------
     env : Any
-        An environment instance providing:
-        - 'opt_time' (float): simulation integrator timestep (must be > 0).
-        - 'ref_traj.increment' (int or float): number of trajectory frames to advance per step (must be > 0).
-        - 'ref_traj.sample_frequency' (int or float): reference trajectory sampling rate in Hz (must be > 0).
-    tolerance : float, optional
-        Maximum allowable deviation from integer when checking the result 
-        (default is 1e-8, to account for floating-point error).
+        Environment providing:
+          - env.opt_time : float > 0
+              Simulation integrator timestep (seconds).
+          - env.ref_traj.increment : int or float > 0
+              Reference‐trajectory frame increment per env.step().
+          - env.ref_traj.sample_frequency : int or float > 0
+              Reference trajectory sampling rate (Hz).
+    tolerance : float, default=1e-8
+        Maximum allowed deviation of `raw_skip` from the nearest integer
+        to account for floating‐point imprecision.
 
     Returns
     -------
     frame_skip : int
-        The integer number of MuJoCo steps to skip per environment step.
+        Number of physics steps per environment step (≥1).
 
     Raises
     ------
     AttributeError
-        If 'opt_time', 'ref_traj.increment', or 'ref_traj.sample_frequency' is missing.
+        If any required attribute is missing.
     ValueError
-        If any of the three parameters is non-positive, or if the computed
-        frame_skip differs from the nearest integer by more than 'tolerance',
-        or if the resulting frame_skip is less than 1.
+        If any parameter is non‐positive, if `raw_skip` differs from its
+        nearest integer by more than `tolerance`, or if the resulting
+        frame_skip < 1.
     """
     try:
-        increment = env.ref_traj.increment
-        opt_time = env.opt_time
-        sample_freq = env.ref_traj.sample_frequency
+        opt_time = float(env.opt_time)
+        increment = float(env.ref_traj.increment)
+        sample_freq = float(env.ref_traj.sample_frequency)
     except AttributeError as e:
-        raise AttributeError(f"Missing required attribute: {e}")
-
-    if not (isinstance(increment, (int, float)) and increment > 0):
-        raise ValueError(f"ref_traj.increment must be > 0, got {increment}")
-    if not (isinstance(opt_time, (int, float)) and opt_time > 0):
-        raise ValueError(f"opt_time must be > 0, got {opt_time}")
-    if not (isinstance(sample_freq, (int, float)) and sample_freq > 0):
-        raise ValueError(f"ref_traj.sample_frequency must be > 0, got {sample_freq}")
-
-    raw_skip = increment / (opt_time * sample_freq)
-    nearest = round(raw_skip)
-    if abs(raw_skip - nearest) > tolerance:
+        raise AttributeError(f"Missing attribute for frameskip calc: {e}")
+    except (TypeError, ValueError):
         raise ValueError(
-            f"Computed frame_skip = {raw_skip:.6f}, which differs from integer {nearest} "
-            f"by more than tolerance {tolerance}. Adjust opt_time, increment, or sample_frequency."
+            "opt_time, ref_traj.increment, and sample_frequency "
+            "must be numeric."
         )
 
-    frame_skip = int(nearest)
-    if frame_skip < 1:
-        raise ValueError(f"Calculated frame_skip is {frame_skip}, but must be at least 1.")
+    if opt_time <= 0.0:
+        raise ValueError(f"opt_time must be positive, got {opt_time}")
+    if increment <= 0.0:
+        raise ValueError(f"ref_traj.increment must be positive, got {increment}")
+    if sample_freq <= 0.0:
+        raise ValueError(f"ref_traj.sample_frequency must be positive, got {sample_freq}")
 
-    return frame_skip
+    raw_skip = increment / (opt_time * sample_freq)
+    nearest = int(round(raw_skip))
+    
+    if not math.isfinite(raw_skip):
+        raise ValueError(f"Computed raw_skip is not finite: {raw_skip}")
+    if abs(raw_skip - nearest) > tolerance:
+        raise ValueError(
+            f"frame_skip {raw_skip:.8f} differs from integer {nearest} "
+            f"by more than tolerance {tolerance}"
+        )
+    if nearest < 1:
+        raise ValueError(f"Calculated frame_skip is {nearest}, must be ≥1")
 
-def playback_ref_traj(env: Any, 
-                      timestep: int = 500, 
-                      fps: int = 50, 
-                      delay: int = 3, 
-                      speed_factor: float = 0.5, 
-                      start_current: bool = True, 
-                      verbose: bool = False) -> None:
+    return nearest
+
+def playback_ref_traj(
+        env: Any, 
+        timestep: int = 500, 
+        fps: int = 50, 
+        delay: float = 3.0, 
+        speed_factor: float = 0.5, 
+        start_current: bool = True, 
+        verbose: bool = False
+        ) -> None:
     """
-    Render the reference gait trajectory in the MuJoCo viewer for debugging and analysis.
+    Render the reference gait trajectory in a passive MuJoCo viewer.
 
     Parameters
     ----------
     env : Any
-        A Gymnasium environment with:
-          - model: mujoco.MjModel
-          - data:  mujoco.MjData
-          - ref_traj: ReferenceTrajectories
-    timestep : int
+        Gymnasium/MuJoCo environment providing:
+          - model : mujoco.MjModel
+          - ref_traj : ReferenceTrajectories
+          - optionally env._ref_data : mujoco.MjData
+    timestep : int, default=500
         Maximum number of frames to render.
-    fps : int
-        Target frames per second (>0).
-    delay : float
+    fps : int, default=50
+        Target frames per second (must be > 0).
+    delay : float, default=3.0
         Seconds to pause before and after playback.
-    speed_factor : float
-        Playback speed multiplier (>0).
-    start_current : bool
-        If True, begin from ref_traj.phase and traj_id; otherwise, start at phase=0 of current traj.
-    verbose : bool
-        If True, log progress.
+    speed_factor : float, default=0.5
+        Playback speed multiplier (must be > 0).
+    start_current : bool, default=True
+        If True, start from the current ref_traj phase; else from phase 0.
+    verbose : bool, default=False
+        If True, log progress and warnings.
 
     Raises
     ------
     ValueError
-        If fps or speed_factor <= 0.
+        If fps or speed_factor ≤ 0.
     RuntimeError
-        On viewer launch or rendering errors.
+        If the viewer fails to launch.
     """
     if fps <= 0 or speed_factor <= 0:
         raise ValueError("fps and speed_factor must be positive.")
-    frame_time = 1 / (fps * speed_factor)
+    frame_time = 1.0 / (fps * speed_factor)
     
-    ref = env.ref_traj
-    model, data = env.model, env.data
-    get_rt = ref.get_reference_trajectories
-    step_rt = ref.next
+    model = env.model
+    ref   = env.ref_traj
+    
+    if not hasattr(env, "_ref_data"):
+        env._ref_data = mujoco.MjData(model)
+    play_data = env._ref_data
+    
+    get_rt   = ref.get_reference_trajectories
+    step_rt  = ref.next
     has_end = lambda: ref.has_reached_end
     
-    orig_phase = ref.phase
-    orig_traj  = ref.traj_id
+    orig_phase  = ref.phase
+    orig_traj_id = ref.traj_id
     
     if not start_current:
-        ref.reset(traj_id=orig_traj, phase=0.0)
+        ref.reset(traj_id=orig_traj_id, phase=0.0)
         if verbose:
-            logger.debug("Playback starting from phase 0%% of traj %d", orig_traj)
+            logger.debug("Playback: starting from phase 0%% of traj %d", orig_traj_id)
     elif verbose:
-        logger.debug("Playback starting from phase %.2f%% of traj %d", orig_phase, orig_traj)
+        logger.debug(
+            "Playback: starting from phase %.2f%% of traj %d",
+            orig_phase, orig_traj_id
+        )
     
     try:
-        playback_viewer = viewer.launch_passive(model, data)
+        my_viewer = viewer.launch_passive(model, play_data)
     except Exception as e:
         raise RuntimeError(f"Failed to launch MuJoCo viewer: {e}")
     
     try:
-        if delay > 0:
-            time.sleep(delay)
+        pelvis_id = model.body("pelvis").id
+        my_viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+        my_viewer.cam.trackbodyid = pelvis_id
+        my_viewer.cam.fixedcamid = -1
+        my_viewer.cam.distance  = 5      
+        my_viewer.cam.azimuth   = 135.0
+        my_viewer.cam.elevation = -20.0  
+    except Exception:
         if verbose:
-            logger.debug("Beginning playback for up to %d frames...", timestep)
-
+            logger.warning("Viewer does not support automatic body tracking.")
+    
+    if delay > 0:
+        time.sleep(delay)   
+    try:
         for frame_idx in range(timestep):
             if has_end():
                 if verbose:
-                    logger.info("Early stop at frame %d: reached end of trajectory", frame_idx)
+                    logger.info(
+                        "Playback: reached end of trajectory at frame %d", frame_idx
+                    )
                 break
 
-            start_t = time.perf_counter()
+            t0 = time.perf_counter()
             try:
                 qpos_ref, qvel_ref = get_rt()
                 qpos = convert_ref_traj_qpos(qpos_ref)
                 qvel = convert_ref_traj_qvel(qvel_ref, qpos_ref)
                 
-                if qpos.shape[0] != model.nq:
-                    raise ValueError(f"qpos length {qpos.shape[0]} != model.nq {model.nq}")
+                if qpos.shape[0] != model.nq or qvel.shape[0] != model.nv:
+                    raise ValueError(
+                        f"Converted qpos length {qpos.shape[0]} != model.nq {model.nq}"
+                    )
                 
-                data.qpos[:] = qpos
-                data.qvel[:] = qvel
-                mujoco.mj_kinematics(model, data)
-                playback_viewer.sync()
+                play_data.qpos[:] = qpos
+                play_data.qvel[:] = qvel
+                mujoco.mj_forward(model, play_data)
+                my_viewer.sync()
 
             except KeyboardInterrupt:
-                logger.warning("Playback interrupted by user.")
+                if verbose:
+                    logger.info("Playback interrupted by user at frame %d", frame_idx)
                 break
             except Exception as err:
                 logger.error("Error at frame %d: %s", frame_idx, err)
                 break
 
-            elapsed = time.perf_counter() - start_t
+            elapsed = time.perf_counter() - t0
             if elapsed < frame_time:
                 time.sleep(frame_time - elapsed)
             elif verbose:
-                logger.warning("Frame %d took %.4fs, target %.4fs", frame_idx, elapsed, frame_time)
+                logger.warning(
+                    "Frame %d took %.4fs (target %.4fs)",
+                    frame_idx, elapsed, frame_time
+                )
 
             step_rt()
     
     finally:
         if delay > 0:
             time.sleep(delay)
-        playback_viewer.close()
-        ref.reset(traj_id=orig_traj, phase=orig_phase)
+            
+        try:
+            my_viewer.close()
+        except Exception:
+            pass
+        ref.reset(traj_id=orig_traj_id, phase=orig_phase)
         if verbose:
-            logger.info("Playback finished, restored phase %.2f%% of traj %d", orig_phase, orig_traj)
+            logger.info(
+                "Playback finished; restored phase %.2f%% of traj %d",
+                orig_phase, orig_traj_id
+            )
     
-def get_penalty(x: np.ndarray,
-                prev_x: Optional[np.ndarray],
-                smoothness_weight: float = 0.005,
-                clip_range: Optional[Tuple[float, float]] = None,
-                enable_clip: bool = False) -> float:
+def get_penalty(
+        x: np.ndarray,
+        prev_x: Optional[np.ndarray],
+        smoothness_weight: float = 0.005,
+        clip_range: Optional[Tuple[float, float]] = None,
+        enable_clip: bool = False
+        ) -> float:
     """
-    Compute a smoothness penalty for the change between two vectors.
+    Compute a smoothness penalty based on the squared norm of the difference
+    between the current vector and the previous vector.
+
+    penalty = smoothness_weight * ||x - prev_x||²
+
+    Optionally, the penalty can be clipped to a specified range.
 
     Parameters
     ----------
-    x : np.ndarray
+    x : array_like
         Current vector.
-    prev_x : np.ndarray or None
-        Previous vector of the same shape as 'x', or None to indicate no previous step.
-    smoothness_weight : float, optional
-        Weight factor (>= 0) applied to the squared norm of the difference.
-        Default is 0.005.
+    prev_x : array_like or None
+        Previous vector of the same shape, or None to indicate this is the first
+        step (in which case penalty = 0.0).
+    smoothness_weight : float, default=0.005
+        Non-negative scaling factor applied to the squared norm of the difference.
     clip_range : tuple of two floats, optional
-        If provided, the penalty will be clipped to the interval
-        [clip_range[0], clip_range[1]]. If None and 'enable_clip' is True,
-        defaults to (0.0, 0.1).
-    enable_clip : bool, optional
-        If True, apply clipping using 'clip_range'. Default is False.
+        (min, max) interval to which the penalty will be clipped if enable_clip
+        is True. If None, defaults to (0.0, 0.1).
+    enable_clip : bool, default=False
+        If True, clip the penalty into the interval specified by clip_range.
 
     Returns
     -------
@@ -351,253 +483,442 @@ def get_penalty(x: np.ndarray,
 
     Raises
     ------
-    TypeError
-        If 'x' or 'prev_x' is not convertible to a NumPy array, or if
-        'smoothness_weight' is not a non-negative float.
     ValueError
-        If 'prev_x' is not None but has a different shape from 'x', or if
-        'smoothness_weight' is negative, or if 'clip_range' is invalid,
-        or if clipping is enabled but would produce an empty interval.
+        If prev_x is not None and shapes of x and prev_x differ, or if
+        smoothness_weight is negative, or if clip_range is invalid when
+        clipping is enabled.
     """
     if prev_x is None:
         return 0.0
 
-    try:
-        x_arr = np.asarray(x, dtype=float)
-        prev_arr = np.asarray(prev_x, dtype=float)
-    except Exception as e:
-        raise TypeError(f"Inputs must be array‐like: {e}")
+    x_arr = np.asarray(x, dtype=np.float64)
+    prev_arr = np.asarray(prev_x, dtype=np.float64)
+    
     if x_arr.shape != prev_arr.shape:
-        raise ValueError(f"Shape mismatch: x has shape {x_arr.shape}, prev_x has {prev_arr.shape}")
-    if not isinstance(smoothness_weight, (int, float)) or smoothness_weight < 0:
-        raise ValueError(f"smoothness_weight must be a non-negative float, got {smoothness_weight}")
+        raise ValueError(
+            f"Shape mismatch: x has shape {x_arr.shape}, prev_x has {prev_arr.shape}"
+        )
+        
+    if not isinstance(smoothness_weight, (int, float)) or smoothness_weight < 0.0:
+        raise ValueError(
+            f"smoothness_weight must be a non-negative number, got {smoothness_weight}"
+        )
+    
+    w = float(smoothness_weight)
 
     diff = x_arr - prev_arr
-    penalty = smoothness_weight * float(np.dot(diff, diff))
+    sq_norm = float((diff * diff).sum())
+    penalty = w * sq_norm
 
     if enable_clip:
         if clip_range is None:
-            min_val, max_val = 0.0, 0.1
+            lo, hi = 0.0, 0.1
         else:
-            if (not isinstance(clip_range, tuple) or
-                len(clip_range) != 2 or
-                not all(isinstance(v, (int, float)) for v in clip_range)):
-                raise ValueError(f"clip_range must be a tuple of two numbers, got {clip_range}")
-            min_val, max_val = float(clip_range[0]), float(clip_range[1])
-        if min_val > max_val:
-            raise ValueError(f"clip_range lower bound {min_val} exceeds upper bound {max_val}")
-        penalty = float(np.clip(penalty, min_val, max_val))
+            if (
+                not isinstance(clip_range, tuple)
+                or len(clip_range) != 2
+                or not all(isinstance(v, (int, float)) for v in clip_range)
+            ):
+                raise ValueError(
+                    f"clip_range must be a tuple of two numbers, got {clip_range}"
+                )
+            lo, hi = float(clip_range[0]), float(clip_range[1])
+        if lo > hi:
+            raise ValueError(
+                f"clip_range lower bound {lo} exceeds upper bound {hi}"
+            )
+        penalty = penalty if penalty >= lo else lo
+        penalty = penalty if penalty <= hi else hi
 
     return penalty
 
-def compute_global_quaternion(tilt: float, list_angle: float, rotation: float) -> quaternion.quaternion:
-    """
-    Convert local pelvis Euler angles (tilt, list, rotation) into a global orientation quaternion.
+# -----------------------------------
+# Euler angle <--> Quaternion Modular 
+# -----------------------------------
 
-    These are composed on top of an initial world-frame pelvis orientation q0 = [√2/2, √2/2, 0, 0].
+_INV_SQRT2 = math.sqrt(2.0) / 2.0
+_Q0_INV = quaternion.quaternion(_INV_SQRT2, -_INV_SQRT2, 0.0, 0.0)
+
+def compute_global_quaternion(
+    tilt: Union[int, float],
+    list_angle: Union[int, float],
+    rotation: Union[int, float]
+    ) -> quaternion.quaternion:
+    """
+    Convert local pelvis Euler angles (tilt, list, rotation) into a global
+    orientation quaternion, using minimal arithmetic and no intermediate arrays.
+
+    The local rotations are applied in Z–X–Y order on top of an initial
+    pelvis orientation q0 = [√2/2, √2/2, 0, 0].
+
+    Steps (all in radians):
+      1. half‐angles: ht = tilt/2, hl = list_angle/2, hr = rotation/2
+      2. compute sin/cos for each half‐angle
+      3. form qz = (cz, 0, 0, sz), qx = (cx, sx, 0, 0), qy = (cy, 0, sy, 0)
+      4. multiply qz * qx → (w1,x1,y1,z1)
+      5. multiply that result by qy → (w2,x2,y2,z2)
+      6. left‐multiply by q0 = (a,a,0,0) where a = √2/2, yielding final (w,x,y,z)
+
+    This avoids creating temporary quaternion objects for qz, qx, qy, and
+    uses only Python floats and math.* calls, for maximum speed.
 
     Parameters
     ----------
     tilt : float
-        Pelvis rotation (radians) about its local z-axis.
+        Rotation about the local Z-axis (radians).
     list_angle : float
-        Pelvis rotation (radians) about its local x-axis.
+        Rotation about the local X-axis (radians).
     rotation : float
-        Pelvis rotation (radians) about its local y-axis.
+        Rotation about the local Y-axis (radians).
 
     Returns
     -------
     quaternion.quaternion
-        The resulting global quaternion in [w, x, y, z] format.
+        The resulting global quaternion in (w, x, y, z) format.
 
     Raises
     ------
     TypeError
-        If any of the inputs is not a real number.
+        If any input is not a real number.
     """
+    # Validate inputs
     for name, val in (("tilt", tilt), ("list_angle", list_angle), ("rotation", rotation)):
-        if not isinstance(val, (int, float, np.floating, np.integer)):
+        if not isinstance(val, (int, float)):
             raise TypeError(f"{name} must be a real number, got {type(val).__name__}")
 
-    q0 = quaternion.quaternion(np.sqrt(2)/2, np.sqrt(2)/2, 0.0, 0.0)
+    # Half‐angles
+    ht = tilt       * 0.5
+    hl = list_angle * 0.5
+    hr = rotation   * 0.5
 
-    qz = quaternion.quaternion(np.cos(tilt / 2), 0.0, 0.0, np.sin(tilt / 2))
-    qx = quaternion.quaternion(np.cos(list_angle / 2), np.sin(list_angle / 2), 0.0, 0.0)
-    qy = quaternion.quaternion(np.cos(rotation / 2), 0.0, np.sin(rotation / 2), 0.0)
+    # Sin/cos once each
+    cz, sz = math.cos(ht), math.sin(ht)
+    cx, sx = math.cos(hl), math.sin(hl)
+    cy, sy = math.cos(hr), math.sin(hr)
 
-    q_inc = qz * qx * qy
+    # qz * qx
+    w1 = cz*cx
+    x1 = cz*sx
+    y1 = sz*sx
+    z1 = sz*cx
 
-    q_global = q0 * q_inc
+    # (qz*qx) * qy
+    w2 = w1*cy - y1*sy
+    x2 = x1*cy - z1*sy
+    y2 = w1*sy + y1*cy
+    z2 = x1*sy + z1*cy
 
-    logger.debug(
-        "Computed global quaternion: [w=%.4f, x=%.4f, y=%.4f, z=%.4f]",
-        q_global.w, q_global.x, q_global.y, q_global.z
-    )
-    return q_global
+    # q0 * (previous result), where q0 = (a,a,0,0)
+    a  = _INV_SQRT2
+    w  = a*(w2 - x2)
+    x  = a*(x2 + w2)
+    y  = a*(y2 - z2)
+    z  = a*(z2 + y2)
 
-def compute_local_angles(q_global: quaternion.quaternion) -> Tuple[float, float, float]:
+    return quaternion.quaternion(w, x, y, z)
+
+def compute_local_angles(
+    q_global: quaternion.quaternion
+    ) -> Tuple[float, float, float]:
     """
-    Extract the pelvis-local Z-X-Y Euler angles (tilt, list, rotation) from a global orientation quaternion.
+    Extract pelvis-local Z–X–Y Euler angles (tilt, list, rotation) from a global quaternion.
+
+    This assumes the global orientation was built as:
+        q_global = q0 * qz(tilt) * qx(list_angle) * qy(rotation),
+    where q0 = [√2/2, √2/2, 0, 0]. We recover the increments q_inc = q0⁻¹ * q_global,
+    then extract Z–X–Y Euler angles directly from q_inc.
 
     Parameters
     ----------
     q_global : quaternion.quaternion
-        Global orientation quaternion in [w, x, y, z] format.
+        Global orientation quaternion (w, x, y, z).
 
     Returns
     -------
-    tilt : float
-        Pelvis rotation (radians) about its local z-axis.
+    tilt       : float
+        Rotation about local Z-axis (radians).
     list_angle : float
-        Pelvis rotation (radians) about its local x-axis.
-    rotation : float
-        Pelvis rotation (radians) about its local y-axis.
+        Rotation about local X-axis (radians).
+    rotation   : float
+        Rotation about local Y-axis (radians).
 
     Raises
     ------
     TypeError
-        If 'q_global' is not a 'quaternion.quaternion'.
-    RuntimeError
-        If the rotation matrix contains invalid values (e.g., due to numerical instability).
-    
-    Notes
-    -----
-    - This extraction can suffer from gimbal lock when 'list_angle' is near ±π/2.
-    - Ensure that 'q_global' was produced by 'compute_global_quaternion' to maintain consistency.
+        If `q_global` is not a quaternion.quaternion.
     """
     if not isinstance(q_global, quaternion.quaternion):
-        raise TypeError(f"q_global must be a quaternion.quaternion, got {type(q_global).__name__}")
-        
-    q0 = quaternion.quaternion(np.sqrt(2)/2, np.sqrt(2)/2, 0.0, 0.0)
-    q_inc = q0.inverse() * q_global
+        raise TypeError(f"q_global must be quaternion.quaternion, got {type(q_global).__name__}")
 
-    R_mat = quaternion.as_rotation_matrix(q_inc)
-    # R = R_z(tilt) * R_x(list) * R_y(rotation) =
-    # [c1c3-s1s2s3, -s1c2, c1s3+s1s2c3]
-    # [s1c3+c1s2s3,  c1c2, s1s3-c1s2c3]
-    # [      -c2s3,    s2,        c2c3]
-    
-    list_angle = np.arcsin(R_mat[2,1])
-    rotation = np.arctan2(-R_mat[2,0], R_mat[2,2])
-    tilt = np.arctan2(-R_mat[0,1], R_mat[1,1])
-    
-    logger.debug("Recovered local angles: tilt=%f, list=%f, rotation=%f", tilt, list_angle, rotation)
+    # Multiply q_inc = q0⁻¹ * q_global
+    w0, x0, y0, z0 = _Q0_INV.w, _Q0_INV.x, _Q0_INV.y, _Q0_INV.z
+    wg, xg, yg, zg = q_global.w, q_global.x, q_global.y, q_global.z
+
+    # Quaternion multiplication (no temporaries)
+    w = w0*wg - x0*xg - y0*yg - z0*zg
+    x = w0*xg + x0*wg + y0*zg - z0*yg
+    y = w0*yg - x0*zg + y0*wg + z0*xg
+    z = w0*zg + x0*yg - y0*xg + z0*wg
+
+    # Precompute squares
+    xx = x*x
+    yy = y*y
+    zz = z*z
+
+    # Extract rotation-matrix elements for Z–X–Y sequence:
+    # R01 =  2*(x*y - w*z)
+    # R11 =  1 - 2*(x² + z²)
+    # R20 =  2*(x*z - w*y)
+    # R22 =  1 - 2*(x² + y²)
+    # R21 =  2*(y*z + w*x)
+    r01 = 2.0 * (x*y - w*z)
+    r11 = 1.0 - 2.0 * (xx + zz)
+    r20 = 2.0 * (x*z - w*y)
+    r22 = 1.0 - 2.0 * (xx + yy)
+    r21 = 2.0 * (y*z + w*x)
+
+    # Clamp for numerical safety
+    if r21 > 1.0:
+        r21 = 1.0
+    elif r21 < -1.0:
+        r21 = -1.0
+
+    # Recover angles
+    list_angle = math.asin(r21)                  # X-axis rotation
+    rotation   = math.atan2(-r20, r22)           # Y-axis rotation
+    tilt       = math.atan2(-r01, r11)           # Z-axis rotation
+
     return tilt, list_angle, rotation
-    
-def convert_ref_traj_qpos(ref_qpos_raw: np.ndarray) -> np.ndarray:
+
+# --------------------------------------
+# Ref-traj format <--> Free-joint format 
+# --------------------------------------
+def convert_ref_traj_qpos(
+    ref_qpos_raw: Union[Sequence[float], np.ndarray]
+    ) -> np.ndarray:
     """
-    Convert a 6-dimensional pelvis state (3 translations + 3 Euler angles)
-    into a 7-dimensional state (3 translations + 4 quaternion components),
-    and append the remaining DOFs unchanged.
+    Convert a 6-dim pelvis reference state into a 7-dim translation+quaternion,
+    then append the remaining joint angles unchanged.
 
-    The input vector is assumed to be:
-        [tz, ty, tx, tilt, list, rotation, ...other joints...]
+    Input format (length ≥ 6):
+        [tz, ty, tx, tilt, list_angle, rotation, ...other joints...]
 
-    The output becomes:
-        [tx, -tz, ty+0.95,  qw, qx, qy, qz, ...other joints...]
+    Output format (length = len(ref_qpos_raw) + 1):
+        [tx, -tz, ty+0.95, qw, qx, qy, qz, ...other joints...]
 
     Parameters
     ----------
-    ref_qpos_raw : np.ndarray
-        1D array of length >= 6 containing the reference pelvis state
-        followed by additional joint angles.
+    ref_qpos_raw : sequence of float or np.ndarray
+        1D array-like with at least 6 elements:
+        - indices 0–2: pelvis [tz, ty, tx]
+        - indices 3–5: Euler angles [tilt, list, rotation]
+        - indices ≥6: other joint coordinates
 
     Returns
     -------
     np.ndarray
-        1D array of length = len(ref_qpos_raw) + 1, where the first 7 entries
-        encode the pelvis as translation+quaternion, and the rest are copied
+        1D array of length `len(ref_qpos_raw) + 1`, where the first 7 entries
+        are the pelvis (translation + quaternion) and the rest are copied
         from ref_qpos_raw[6:].
 
     Raises
     ------
     TypeError
-        If ref_qpos_raw is not array-like or cannot be converted to 1D float array.
+        If ref_qpos_raw cannot be converted to a 1D numeric array.
     ValueError
         If ref_qpos_raw has fewer than 6 elements.
     """
+    # Convert input to 1D float64 array
     try:
-        temp = np.asarray(ref_qpos_raw, dtype=float).ravel()
+        tmp = np.asarray(ref_qpos_raw, dtype=np.float64).ravel()
     except Exception as e:
         raise TypeError(f"ref_qpos_raw must be array-like of numbers: {e}")
-    if temp.size < 6:
-        raise ValueError(f"Expected at least 6 elements, got {temp.size}")
+    if tmp.size < 6:
+        raise ValueError(f"ref_qpos_raw requires at least 6 elements, got {tmp.size}")
 
-    pelvis_translation = np.array([temp[2], -temp[0], 0.95 + temp[1]])
-    logger.debug("Converted pelvis translation: %s", pelvis_translation)
+    # Determine how many "other joints" follow
+    n_remain = tmp.size - 6
 
-    # Convert pelvis rotation: use compute_global_quaternion to get the global quaternion
-    pelvis_q = compute_global_quaternion(temp[3], temp[4], temp[5])
-    pelvis_quat = np.array([pelvis_q.w, pelvis_q.x, pelvis_q.y, pelvis_q.z])
-    logger.debug("Converted pelvis quaternion: [%f, %f, %f, %f]", pelvis_q.w, pelvis_q.x, pelvis_q.y, pelvis_q.z)
+    # Allocate output: 7 pelvis dims + remaining joints
+    out = np.empty(7 + n_remain, dtype=np.float64)
 
-    # Concatenate the new pelvis state with the rest of the joint states
-    new_ref_qpos = np.concatenate((pelvis_translation, pelvis_quat, temp[6:]))
-    logger.debug("New qpos dimension: %d", new_ref_qpos.shape[0])
-    return new_ref_qpos    
-    
-def inverse_convert_ref_traj_qpos(d_qpos: np.ndarray) -> np.ndarray:
+    # 1) Pelvis translation: [x, y, z] = [tx, -tz, ty + 0.95]
+    out[0] = tmp[2]          # tx
+    out[1] = -tmp[0]         # -tz
+    out[2] = tmp[1] + 0.95   # ty + 0.95
+
+    # 2) Pelvis orientation quaternion
+    q = compute_global_quaternion(tmp[3], tmp[4], tmp[5])
+    out[3] = q.w
+    out[4] = q.x
+    out[5] = q.y
+    out[6] = q.z
+
+    # 3) Copy remaining joint angles (if any)
+    if n_remain > 0:
+        out[7:] = tmp[6:]
+
+    logger.debug("convert_ref_traj_qpos → output length %d", out.size)
+    return out
+
+def inverse_convert_ref_traj_qpos(
+    d_qpos: Union[Sequence[float], np.ndarray]
+    ) -> np.ndarray:
     """
-    Convert a freejoint-format state vector (3 translations + 4-component quaternion + other DOFs)
-    back to the reference trajectory format (3 translations + 3 Euler angles + other DOFs).
+    Invert a freejoint-format reference pose back to the original 6-DOF pelvis
+    + rest-of-joints format.
 
-    This is the inverse of 'convert_ref_traj_qpos', reversing:
-      - Translation reordering and offset:
-          [tx, -tz, ty + 0.95] → [tz, ty, tx]
-      - Quaternion back to Z-X-Y Euler angles.
+    This reverses `convert_ref_traj_qpos`, mapping:
+      - Translations: [tx, -tz, ty+0.95] → [tz, ty, tx]
+      - Orientation: 4-component quaternion → Z–X–Y Euler angles
+      - Other DOFs passed through unchanged.
 
     Parameters
     ----------
-    d_qpos : np.ndarray
-        State vector in freejoint format, length >= 7.
-        The first 3 elements are the pelvis translation [tx, -tz, ty+0.95],
-        and the next 4 are the quaternion [w, x, y, z].
+    d_qpos : array_like, shape (>=7,)
+        Freejoint-format state, where:
+          - d_qpos[0:3] are [tx, -tz, ty+0.95],
+          - d_qpos[3:7] are quaternion (w, x, y, z),
+          - d_qpos[7:] are the remaining joint DOFs.
 
     Returns
     -------
-    np.ndarray
-        Recovered reference trajectory state vector:
-        [tz, ty, tx, tilt, list, rotation, ...other DOFs...], length = len(d_qpos) - 1.
+    np.ndarray, shape (len(d_qpos)-1,)
+        Recovered reference trajectory state:
+        [tz, ty, tx, tilt, list_angle, rotation, ...other DOFs...].
 
     Raises
     ------
     TypeError
-        If 'd_qpos' is not array-like of real numbers.
+        If `d_qpos` cannot be converted to a 1D numeric array.
     ValueError
-        If 'd_qpos' has fewer than 7 elements.
+        If `d_qpos` has fewer than 7 elements.
     RuntimeError
         If quaternion-to-Euler conversion fails.
     """
+    # Convert to 1D float array
     try:
-        arr = np.asarray(d_qpos, dtype=float).ravel()
+        arr = np.asarray(d_qpos, dtype=np.float64).ravel()
     except Exception as e:
         raise TypeError(f"d_qpos must be array-like of numbers: {e}")
-    if arr.size < 7:
-        raise ValueError(f"d_qpos must have at least 7 elements, got {arr.size}")
-        
-    pelvis_trans = arr[0:3]
-    w, x, y, z = arr[3:7]
+    n = arr.size
+    if n < 7:
+        raise ValueError(f"d_qpos must have at least 7 elements, got {n}")
 
-    orig_translation = np.array([-pelvis_trans[1], pelvis_trans[2] - 0.95, pelvis_trans[0]])
-    logger.debug("Recovered original pelvis translation: %s", orig_translation)
-    
+    # Preallocate output: one fewer element
+    out = np.empty(n - 1, dtype=arr.dtype)
+
+    # 1) Recover pelvis translation:
+    #    arr[0]=tx, arr[1]=-tz, arr[2]=ty+0.95
+    out[0] = -arr[1]        # tz
+    out[1] = arr[2] - 0.95  # ty
+    out[2] = arr[0]         # tx
+
+    # 2) Recover local Euler angles from quaternion
+    w, x, y, z = arr[3], arr[4], arr[5], arr[6]
     q = quaternion.quaternion(w, x, y, z)
     try:
         tilt, list_angle, rotation = compute_local_angles(q)
     except Exception as e:
-        raise RuntimeError(f"Failed to recover Euler angles from quaternion: {e}")
-    logger.debug(
-        "Recovered Euler angles: tilt=%.6f, list=%.6f, rotation=%.6f",
-        tilt, list_angle, rotation
-    )
-    
-    orig_pelvis_state = np.concatenate((orig_translation, np.array([tilt, list_angle, rotation])))
-    orig_ref_qpos = np.concatenate((orig_pelvis_state, d_qpos[7:]))
-    logger.debug("Recovered ref qpos dimension: %d", orig_ref_qpos.shape[0])
-    
-    return orig_ref_qpos
+        raise RuntimeError(f"Euler recovery failed: {e}")
+    out[3] = tilt
+    out[4] = list_angle
+    out[5] = rotation
 
-def euler_rates_to_axis_angle(tilt: float, 
+    # 3) Copy remaining DOFs (if any)
+    if n > 7:
+        out[6:] = arr[7:]
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "inverse_convert_ref_traj_qpos → recovered length %d", out.size
+        )
+    return out
+
+
+def euler_rates_to_axis_angle(
+    tilt: Union[int, float],
+    list_angle: Union[int, float],
+    rotation: Union[int, float],
+    tilt_rate: Union[int, float],
+    list_rate: Union[int, float],
+    rotation_rate: Union[int, float],
+    dt: float = 0.001
+    ) -> np.ndarray:
+    """
+    Convert Z–X–Y Euler angle rates into the global angular velocity vector ω,
+    by small‐step quaternion integration.
+
+    Steps:
+      1. Compute current global quaternion q0 = Q(tilt, list_angle, rotation).
+      2. Advance each Euler angle by rate*dt, get q1.
+      3. Compute delta quaternion qDelta = q0.inverse() * q1.
+      4. For small dt, rotation vector ≈ 2 * (qDelta.x, qDelta.y, qDelta.z).
+      5. ω = rotation_vector / dt.
+
+    Parameters
+    ----------
+    tilt : float
+        Current pelvis tilt (radians) about local Z.
+    list_angle : float
+        Current pelvis list (radians) about local X.
+    rotation : float
+        Current pelvis rotation (radians) about local Y.
+    tilt_rate : float
+        Time derivative of tilt (rad/s).
+    list_rate : float
+        Time derivative of list (rad/s).
+    rotation_rate : float
+        Time derivative of rotation (rad/s).
+    dt : float, default=0.001
+        Time step over which rates are applied (seconds). Must be > 0.
+
+    Returns
+    -------
+    np.ndarray, shape (3,)
+        Global angular velocity [ω_x, ω_y, ω_z] in rad/s.
+
+    Raises
+    ------
+    ValueError
+        If dt ≤ 0.
+    TypeError
+        If any input is not a numeric type.
+    """
+    # -- Validate --
+    if not isinstance(dt, (int, float)) or dt <= 0:
+        raise ValueError(f"dt must be positive, got {dt}")
+    for name, val in (
+        ("tilt", tilt), ("list_angle", list_angle), ("rotation", rotation),
+        ("tilt_rate", tilt_rate), ("list_rate", list_rate), ("rotation_rate", rotation_rate)
+    ):
+        if not isinstance(val, (int, float)):
+            raise TypeError(f"{name} must be a real number, got {type(val).__name__}")
+
+    # -- Current quaternion --
+    q0 = compute_global_quaternion(tilt, list_angle, rotation)
+
+    # -- Next quaternion after Euler‐step dt --
+    t1 = tilt      + tilt_rate      * dt
+    l1 = list_angle+ list_rate      * dt
+    r1 = rotation  + rotation_rate  * dt
+    q1 = compute_global_quaternion(t1, l1, r1)
+
+    # -- Delta quaternion in body/world frame --
+    qd = q0.inverse() * q1
+
+    # -- For small dt, rotation_vector ≈ 2 * qd.vec
+    vx, vy, vz = qd.x, qd.y, qd.z
+    omega = np.array([vx, vy, vz], dtype=float) * (2.0 / dt)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "euler_rates_to_axis_angle: ω=[%.4f, %.4f, %.4f]",
+            omega[0], omega[1], omega[2]
+        )
+    return omega
+
+def euler_rates_to_axis_angle1(tilt: float, 
                               list_angle: float, 
                               rotation: float,
                               tilt_dot: float, 
@@ -670,137 +991,204 @@ def euler_rates_to_axis_angle(tilt: float,
     logger.debug("Computed angular velocity: %s", ang_vel)
     return ang_vel
 
-def convert_ref_traj_qvel(ref_qvel_raw: np.ndarray, 
-                          ref_qpos_raw: np.ndarray, 
-                          dt: float = 0.001) -> np.ndarray:
+def convert_ref_traj_qvel(
+    ref_qvel_raw: Union[Sequence[float], np.ndarray],
+    ref_qpos_raw: Union[Sequence[float], np.ndarray],
+    dt: float = 0.001
+    ) -> np.ndarray:
     """
-    Convert the pelvis portion of a reference trajectory velocity vector from
-    local Euler-rate form into global velocity (linear + axis-angle angular velocity).
+    Convert a reference trajectory’s pelvis velocity from local Euler‐rate form
+    into global linear + angular velocity, then append the remaining DOFs unchanged.
+
+    Input:
+      ref_qvel_raw (length ≥ 6):
+        [v_z, v_y, v_x, tilt_dot, list_dot, rotation_dot, ...]
+      ref_qpos_raw (length ≥ 6):
+        [tz, ty, tx, tilt, list, rotation, ...]
+
+    Output (same length as ref_qvel_raw):
+      [v_x, -v_z, v_y, ω_x, ω_y, ω_z, ...other DOFs...]
+
+    The angular part ω = [ω_x, ω_y, ω_z] is computed by
+    `euler_rates_to_axis_angle(tilt, list, rotation,
+                               tilt_dot, list_dot, rotation_dot, dt)`.
 
     Parameters
     ----------
-    ref_qvel_raw : np.ndarray
-        1D array with length >= 6: [v_z, v_y, v_x, tilt_dot, list_dot, rotation_dot, ...].
-    ref_qpos_raw : np.ndarray
-        1D array with length >= 6: [tz, ty, tx, tilt, list, rotation, ...].
+    ref_qvel_raw : array_like
+        1D array of length ≥ 6: pelvis velocities + Euler rates + other DOFs.
+    ref_qpos_raw : array_like
+        1D array of length ≥ 6: pelvis positions + Euler angles + other DOFs.
     dt : float, default=0.001
-        Timestep (s) used for finite-difference conversion of Euler rates to angular velocity.
+        Time step (s) used in the Euler→axis‐angle conversion. Must be > 0.
 
     Returns
     -------
     np.ndarray
-        1D array of the same length as 'ref_qvel_raw'. The first six elements are:
-        [v_x, -v_z, v_y, ω_x, ω_y, ω_z], and the rest are 'ref_qvel_raw[6:]'.
+        1D array of same length as `ref_qvel_raw`, with the first 6 entries
+        transformed to [global linear vel, global angular vel] and the rest copied.
 
     Raises
     ------
     TypeError
-        If inputs are not convertible to 1D float arrays.
+        If inputs cannot be converted to 1D numeric arrays.
     ValueError
-        If inputs have fewer than 6 elements or if 'dt' is non-positive.
+        If either array has fewer than 6 elements or if `dt` ≤ 0.
     RuntimeError
-        If conversion to angular velocity fails.
+        If the Euler‐rate→angular‐velocity conversion fails.
     """
+    # Convert and validate inputs
     try:
-        vel = np.asarray(ref_qvel_raw, dtype=float).ravel()
-        pos = np.asarray(ref_qpos_raw, dtype=float).ravel()
+        vel = np.asarray(ref_qvel_raw, dtype=np.float64).ravel()
+        pos = np.asarray(ref_qpos_raw, dtype=np.float64).ravel()
     except Exception as e:
         raise TypeError(f"Inputs must be array-like of numbers: {e}")
+
     if vel.size < 6 or pos.size < 6:
-        raise ValueError(f"Both ref_qvel_raw and ref_qpos_raw must have at least 6 elements; "
-                         f"got {vel.size} and {pos.size}")
-    if dt <= 0:
+        raise ValueError(f"Both arrays must have at least 6 elements; got {vel.size} and {pos.size}")
+    if dt <= 0.0:
         raise ValueError(f"dt must be positive, got {dt}")
-        
-    v_z, v_y, v_x = vel[0], vel[1], vel[2]
-    tilt_dot, list_dot, rotation_dot = vel[3], vel[4], vel[5]
-    tilt, list_angle, rotation = pos[3], pos[4], pos[5]
-    
-    lin_vel = np.array([v_x, -v_z, v_y], dtype=float)
-    logger.debug("Converted linear velocity: %s", lin_vel)
+
+    n = vel.size
+    out = np.empty(n, dtype=np.float64)
+
+    # 1) Global linear velocity: [v_x, -v_z, v_y]
+    #    raw ordering: [v_z, v_y, v_x]
+    out[0] = vel[2]
+    out[1] = -vel[0]
+    out[2] = vel[1]
+
+    # 2) Global angular velocity via quaternion small‐step
     try:
         ang_vel = euler_rates_to_axis_angle(
-            tilt, list_angle, rotation,
-            tilt_dot, list_dot, rotation_dot,
+            pos[3], pos[4], pos[5],
+            vel[3], vel[4], vel[5],
             dt
         )
     except Exception as e:
-        raise RuntimeError(f"Failed to convert Euler rates to angular velocity: {e}")
-    logger.debug("Converted angular velocity: %s", ang_vel)
-    pelvis_vel = np.concatenate((lin_vel, ang_vel))
-    rest = vel[6:]
-    return np.concatenate((pelvis_vel, rest))
+        raise RuntimeError(f"Euler‐rate to angular velocity conversion failed: {e}")
 
-def inverse_convert_ref_traj_qvel(d_qvel: np.ndarray, 
-                                  ref_qpos_raw: np.ndarray, 
-                                  dt: float = 0.001) -> np.ndarray:
+    out[3:6] = ang_vel
+
+    # 3) Copy remaining DOFs (if any)
+    if n > 6:
+        out[6:] = vel[6:]
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "convert_ref_traj_qvel → linear=%s, angular=%s, total_length=%d",
+            out[:3], out[3:6], n
+        )
+    return out
+
+def inverse_convert_ref_traj_qvel(
+    d_qvel: Union[Sequence[float], np.ndarray],
+    ref_qpos_raw: Union[Sequence[float], np.ndarray],
+    dt: float = 0.001
+    ) -> np.ndarray:
     """
-    Inversely convert a velocity vector from global (linear + axis-angle angular) form
-    back into the reference trajectory format of (local linear + Euler-rate angular).
+    Inversely convert a global pelvis+angular‐velocity vector back into
+    the reference‐trajectory format of local linear velocities + Euler‐rate angular velocities.
+
+    The forward mapping was:
+      ref_qvel_raw = [v_z, v_y, v_x, tilt_dot, list_dot, rotation_dot, ...]
+      d_qvel = [v_x, -v_z, v_y, ω_x, ω_y, ω_z, ...]
+      where ω = euler_rates_to_axis_angle(...).
+
+    This function inverts that:
+      - Recover [v_z, v_y, v_x] from [v_x, -v_z, v_y].
+      - Recover Euler‐rates by small‐step quaternion integration:
+          q0 = Q(tilt, list_angle, rotation)
+          Δq = from_rotation_vector(ω * dt)
+          q1 = q0 * Δq
+          (tilt1, list1, rot1) = euler angles of q1
+          rates = (tilt1 − tilt)/dt, etc.
 
     Parameters
     ----------
-    d_qvel : np.ndarray
-        1D array with length >= 6: [v_x, v_y, v_z, ω_x, ω_y, ω_z, ...].
-    ref_qpos_raw : np.ndarray
-        1D array with length >= 6: [tz, ty, tx, tilt, list, rotation, ...].
+    d_qvel : array_like, shape (>=6,)
+        Global velocity from `convert_ref_traj_qvel`:
+        [v_x, v_y, v_z, ω_x, ω_y, ω_z, ...].
+    ref_qpos_raw : array_like, shape (>=6,)
+        The original reference positions:
+        [tz, ty, tx, tilt, list_angle, rotation, ...].
     dt : float, default=0.001
-        Timestep (seconds) used when converting angular velocity back to Euler-rate.
+        Time step (s) matching the forward conversion.
 
     Returns
     -------
-    np.ndarray
-        1D array matching 'd_qvel' length, where the first six elements are:
-        [v_z, v_y, v_x, tilt_dot, list_dot, rotation_dot], and the tail is 'd_qvel[6:]'.
+    np.ndarray, shape same as d_qvel
+        Recovered reference velocities:
+        [v_z, v_y, v_x, tilt_dot, list_dot, rotation_dot, ...].
 
     Raises
     ------
     TypeError
-        If inputs are not array-like of numbers.
+        If inputs cannot be converted to numeric arrays.
     ValueError
-        If input arrays have fewer than 6 elements or 'dt' is non-positive.
+        If either array has fewer than 6 elements or `dt` <= 0.
     RuntimeError
-        If quaternion operations fail (e.g., invalid rotation vector).
-
-    Notes
-    -----
-    - Assumes 'compute_global_quaternion' and 'compute_local_angles' use consistent conventions.
-    - Accuracy depends on small 'dt'; for large angular velocities or dt, integration error may grow.
+        If quaternion‐to‐Euler conversion fails.
     """
+    # --- Convert and validate inputs ---
     try:
-        vel = np.asarray(d_qvel, dtype=float).ravel()
-        pos = np.asarray(ref_qpos_raw, dtype=float).ravel()
+        arr_vel = np.asarray(d_qvel, dtype=float).ravel()
+        arr_pos = np.asarray(ref_qpos_raw, dtype=float).ravel()
     except Exception as e:
-        raise TypeError(f"Inputs must be array-like numeric: {e}")
-    if vel.size < 6 or pos.size < 6:
-        raise ValueError(f"Both d_qvel and ref_qpos_raw must have at least 6 elements; "
-                         f"got {vel.size} and {pos.size}")
-    if dt <= 0:
+        raise TypeError(f"Inputs must be array-like of numbers: {e}")
+    if arr_vel.size < 6 or arr_pos.size < 6:
+        raise ValueError(f"Both vectors must have ≥6 elements; got {arr_vel.size}, {arr_pos.size}")
+    if dt <= 0.0:
         raise ValueError(f"dt must be positive, got {dt}")
-        
-    d_lin = vel[0:3]
-    original_lin = np.array([-d_lin[1], d_lin[2], d_lin[0]])
-    
-    tilt, list_angle, rotation = pos[3:6]
-    
-    q0 = compute_global_quaternion(tilt, list_angle, rotation)
-    ang_vel = vel[3:6]
-    delta_rot = ang_vel * dt
-    delta_q = quaternion.from_rotation_vector(delta_rot)    
-    q_new = q0 * delta_q
-    
-    tilt_new, list_new, rotation_new = compute_local_angles(q_new)
-    
-    euler_rates = np.array([
-        (tilt_new - tilt) / dt,
-        (list_new - list_angle) / dt,
-        (rotation_new - rotation) / dt,
-    ])
-    
-    pelvis_ref_qvel = np.concatenate((original_lin, euler_rates))
-    
-    new_ref_qvel = np.concatenate((pelvis_ref_qvel, vel[6:]))
-    return new_ref_qvel
+
+    # Prepare output array
+    out = np.empty_like(arr_vel)
+
+    # --- 1) Invert linear velocity mapping ---
+    # forward: [v_z, v_y, v_x] → [v_x, -v_z, v_y]
+    # so inverse:
+    #   orig_vz = -d_qvel[1]
+    #   orig_vy =  d_qvel[2]
+    #   orig_vx =  d_qvel[0]
+    out[0] = -arr_vel[1]   # v_z
+    out[1] =  arr_vel[2]   # v_y
+    out[2] =  arr_vel[0]   # v_x
+
+    # --- 2) Invert angular rates via quaternion small‐step ---
+    tilt, list_ang, rotation = arr_pos[3], arr_pos[4], arr_pos[5]
+    omega = arr_vel[3:6]  # global angular velocity [ω_x, ω_y, ω_z]
+
+    # Current orientation
+    q0 = compute_global_quaternion(tilt, list_ang, rotation)
+    # Small‐step delta quaternion from ω * dt
+    try:
+        delta_q = quaternion.from_rotation_vector(omega * dt)
+    except Exception as e:
+        raise RuntimeError(f"Failed to form delta quaternion: {e}")
+    # Advance orientation
+    q1 = q0 * delta_q
+
+    # Extract new local Euler angles
+    try:
+        tilt1, list1, rot1 = compute_local_angles(q1)
+    except Exception as e:
+        raise RuntimeError(f"Failed to recover Euler angles: {e}")
+
+    # Recover rates by finite difference
+    out[3] = (tilt1 - tilt) / dt
+    out[4] = (list1 - list_ang) / dt
+    out[5] = (rot1 - rotation) / dt
+
+    # --- 3) Copy remaining DOFs ---
+    if arr_vel.size > 6:
+        out[6:] = arr_vel[6:]
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "inverse_convert_ref_traj_qvel → linear=[%.4f,%.4f,%.4f], rates=[%.4f,%.4f,%.4f]",
+            out[0], out[1], out[2], out[3], out[4], out[5]
+        )
+    return out
 
 def get_ref_ee_pos(ref_qpos: np.ndarray, ee: str = 'rightfoot') -> np.ndarray:
     """
