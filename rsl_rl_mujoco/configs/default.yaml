@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/test"
+log_dir: "./logs/test1"

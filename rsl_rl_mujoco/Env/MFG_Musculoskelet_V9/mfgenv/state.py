@@ -487,7 +487,8 @@ def get_pelvis_kinematics(
     return state, comp
 
 def compute_ref_site_kinematics(
-        env: Any
+        env: Any,
+        include_orient_angvel: bool = False
         ) -> Dict[str, Dict[str, np.ndarray]]:
     """
     Compute reference‐trajectory kinematics for all non‐pelvis joint sites.
@@ -515,6 +516,8 @@ def compute_ref_site_kinematics(
                 (site_id, site_name, (vadr,vdim), (gadr,gdim))
           - env._pelvis_gyro    : (gadr_pel, gdim_pel) for pelvis gyro sensor
           - env.relative_pelvis : bool
+    include_orient_angvel : bool
+        If False, won't return orient and angvel.
 
     Returns
     -------
@@ -616,15 +619,22 @@ def compute_ref_site_kinematics(
         vel_dict[name]    = linvel
         orient_dict[name] = orient6
         angvel_dict[name] = angvel
-
-    return {
+    
+    result = {
         "pos":    pos_dict,
         "linvel": vel_dict,
-        "orient": orient_dict,
-        "angvel": angvel_dict
     }
 
-def get_site_kinematics(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
+    if include_orient_angvel:
+        result["orient"] = orient_dict
+        result["angvel"] = angvel_dict
+
+    return result
+
+def get_site_kinematics(
+        env: Any,
+        include_orient_angvel: bool = False
+        ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     Retrieve kinematics for all non‐pelvis joint sites and the remaining qpos/qvel.
 
@@ -648,7 +658,9 @@ def get_site_kinematics(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
           - env._pelvis_gyro    : Tuple[gadr_pel, gdim_pel]
           - env.relative_pelvis : bool
           - env.pelvis_heading  : np.ndarray shape (3,)
-
+    include_orient_angvel : bool
+        If False, won't return orient and angvel.
+        
     Returns
     -------
     joint_state : np.ndarray, shape=(M,)
@@ -750,30 +762,37 @@ def get_site_kinematics(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     qpj = qpos[7:].astype(np.float32, copy=True)
     qvj = qvel[6:].astype(np.float32, copy=True)
 
-    L = 3*N + 6*N + 3*N + 3*N
+    if include_orient_angvel:
+        L = 3*N + 6*N + 3*N + 3*N
+    else:
+        L = 3*N + 3*N
+
     joint_state = np.empty(L + qpj.size + qvj.size, dtype=np.float32)
     off = 0
-    joint_state[off:off+3*N]       = pos_arr.ravel();    off += 3*N
-    joint_state[off:off+6*N]       = orient_arr.ravel(); off += 6*N
-    joint_state[off:off+3*N]       = linvel_arr.ravel(); off += 3*N
-    joint_state[off:off+3*N]       = angvel_arr.ravel(); off += 3*N
-    joint_state[off:off+qpj.size]  = qpj;                off += qpj.size
-    joint_state[off:off+qvj.size]  = qvj
+    joint_state[off:off+3*N] = pos_arr.ravel()
+    off += 3*N
+    if include_orient_angvel:
+        joint_state[off:off+6*N] = orient_arr.ravel()
+        off += 6*N
+    joint_state[off:off+3*N] = linvel_arr.ravel()
+    off += 3*N
+    if include_orient_angvel:
+        joint_state[off:off+3*N] = angvel_arr.ravel()
+        off += 3*N
+    joint_state[off:off+qpj.size] = qpj
+    off += qpj.size
+    joint_state[off:off+qvj.size] = qvj
 
     # --- Prepare components dict ---
     components: Dict[str, Any] = {
-        'pos':   {},
-        'orient':{},
-        'linvel':{},
-        'angvel':{},
+        'pos':        {name: pos_arr[i]   for i, name in enumerate(names)},
+        'linvel':     {name: linvel_arr[i] for i, name in enumerate(names)},
         'joint_qpos': qpj,
         'joint_qvel': qvj
     }
-    for i, name in enumerate(names):
-        components['pos'][name]    = pos_arr[i]
-        components['orient'][name] = orient_arr[i]
-        components['linvel'][name] = linvel_arr[i]
-        components['angvel'][name] = angvel_arr[i]
+    if include_orient_angvel:
+        components['orient'] = {name: orient_arr[i] for i, name in enumerate(names)}
+        components['angvel'] = {name: angvel_arr[i]  for i, name in enumerate(names)}
 
     return joint_state, components
 
@@ -844,7 +863,7 @@ def get_traj_info(
         raise ValueError(f"qpos/qvel second dimension must equal traj_frames ({total}); got {N1}, {N2}")
 
     if horizon is None:
-        offsets = np.array([1, 2], dtype=int)
+        offsets = np.array([2], dtype=int)
     elif isinstance(horizon, int):
         offsets = np.array([horizon], dtype=int)
     elif isinstance(horizon, (list, tuple)):
@@ -1033,15 +1052,15 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
 
     # 2) Joint sites
     try:
-        joint_state, joint_comp = gs(env)
+        joint_state, joint_comp = gs(env, include_orient_angvel=False)
     except Exception as e:
         raise ValueError(f"get_site_kinematics failed: {e}")
 
-    # 3) COM
-    try:
-        com_state, com_comp = gc(env)
-    except Exception as e:
-        raise ValueError(f"get_COM_kinematics failed: {e}")
+    # # 3) COM
+    # try:
+    #     com_state, com_comp = gc(env)
+    # except Exception as e:
+    #     raise ValueError(f"get_COM_kinematics failed: {e}")
 
     # 4) GRF
     try:
@@ -1066,7 +1085,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     sub_states: List[np.ndarray] = [
         pelvis_state,
         joint_state,
-        com_state,
+        # com_state,
         grf_state,
         foot_contacts,
         future_state
@@ -1089,7 +1108,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     components: Dict[str, Any] = {
         'pelvis':        pelvis_comp,
         'joint':         joint_comp,
-        'com':           com_comp,
+        # 'com':           com_comp,
         'grf':           grf_comp,
         'foot_contacts': foot_contacts,
         'traj':          future_comp
