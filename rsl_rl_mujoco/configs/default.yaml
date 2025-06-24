@@ -3,8 +3,8 @@ hydra:
     dir: .
   output_subdir: null
 env:
-  id: "MFG_MS_V9"
-  num_envs: 64
+  id: "MFG_MS_V8"
+  num_envs: 1
 
 train:
   num_steps_per_env: 400 
@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/test"
+log_dir: "./logs/modify_amp"
