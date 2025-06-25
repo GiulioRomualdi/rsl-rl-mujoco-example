@@ -25,7 +25,7 @@ class Discriminator(nn.Module):
         self,
         input_dim: int,
         hidden_layer_sizes: list[int],
-        reward_scale: float,
+        reward_scale: float = 1.,
         reward_clamp_epsilon: float = 0.0001,
         device: str = "cpu",
     ):
@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
 
         self.trunk = nn.Sequential(*layers).to(device)
         self.linear = nn.Linear(hidden_layer_sizes[-1], 1).to(device)
-
+        self.alpha=torch.pi
         self.trunk.train()
         self.linear.train()
 
@@ -96,6 +96,13 @@ class Discriminator(nn.Module):
                 next_state = normalizer.normalize(next_state)
 
             d = self.forward(torch.cat([state, next_state], dim=-1))
-            reward = self.reward_scale * torch.clamp(1 - (1/4) * torch.square(d - 1), min=0)
+            # reward = self.reward_scale * torch.clamp(1 - (1/4) * torch.square(d - 1), min=0)
+            reward = torch.clamp(
+                    self.reward_scale
+                    * torch.log1p(self.alpha * (d + 1))
+                    / torch.log1p(torch.tensor(2 * self.alpha, device=d.device)),
+                    min=0.0,
+                    max=1.0
+                )
 
             return reward.squeeze()

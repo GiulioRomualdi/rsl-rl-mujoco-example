@@ -59,7 +59,7 @@ train:
   discriminator:
     use: true
     hidden_dims: [1024,512]
-    reward_scale: 1
+    reward_scale: 1.
     amploader:
       amp_data_path: "Env/data_test"
       dataset_names: null
