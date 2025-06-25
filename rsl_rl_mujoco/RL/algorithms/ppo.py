@@ -420,6 +420,8 @@ class PPO:
             # Process AMP loss by unpacking policy and expert AMP samples.
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
+            policy_state_unnorm = torch.clone(policy_state)
+            expert_state_unnorm = torch.clone(expert_state)
             # print(policy_state.shape)
             # print(expert_state.shape)
             # import ipdb;ipdb.set_trace()
@@ -524,8 +526,8 @@ class PPO:
 
             # Update the normalizer with current policy and expert AMP observations.
             if self.amp_normalizer is not None:
-                self.amp_normalizer.update(policy_state)
-                self.amp_normalizer.update(expert_state)
+                self.amp_normalizer.update(policy_state_unnorm)
+                self.amp_normalizer.update(expert_state_unnorm)
             # Compute probabilities from the discriminator logits.
             # Store the losses
             mean_value_loss += value_loss.item()
