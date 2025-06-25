@@ -96,6 +96,7 @@ class Discriminator(nn.Module):
                 next_state = normalizer.normalize(next_state)
 
             d = self.forward(torch.cat([state, next_state], dim=-1))
+            d = torch.clamp(d,min=-1.,max=1.)
             # reward = self.reward_scale * torch.clamp(1 - (1/4) * torch.square(d - 1), min=0)
             reward = torch.clamp(
                     self.reward_scale
@@ -104,5 +105,4 @@ class Discriminator(nn.Module):
                     min=0.0,
                     max=1.0
                 )
-
             return reward.squeeze()
