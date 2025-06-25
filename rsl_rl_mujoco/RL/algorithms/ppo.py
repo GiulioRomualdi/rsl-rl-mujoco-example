@@ -275,7 +275,7 @@ class PPO:
             mini_batch_size=(
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            //(self.num_mini_batches * 200),
+            //(self.num_mini_batches),
             allow_replacement=True,
         )
         amp_expert_generator = self.amp_data.feed_forward_generator(
@@ -283,7 +283,7 @@ class PPO:
             (
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            // (self.num_mini_batches * 200),
+            // (self.num_mini_batches * 400),
         )
         # import ipdb;ipdb.set_trace()# iterate over batches
         for (
