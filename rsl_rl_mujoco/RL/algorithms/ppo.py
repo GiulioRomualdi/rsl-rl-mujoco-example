@@ -32,7 +32,7 @@ class PPO:
         discriminator: Discriminator,
         amp_data: None,
         amp_normalizer: Optional[Any],
-        amp_replay_buffer_size: int = 100000,
+        amp_replay_buffer_size: int = 51200,
         use_smooth_ratio_clipping: bool = False,
         num_learning_epochs=1,
         num_mini_batches=1,
