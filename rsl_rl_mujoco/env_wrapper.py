@@ -72,16 +72,25 @@ class SB3RslVecEnv(VecEnv):
         # step through vectorized env
         out = self.env.step(actions_np)
         obs_batch, reward_batch, done_batch, info_batch = out[:4]
-        
+        obs_term = obs_batch.copy()
+        reset_idxs = np.nonzero(done_batch)[0]
+        for i in reset_idxs:
+            term_obs = info_batch[i].get("terminal_observation")
+            if term_obs is not None:
+                obs_term[i] = term_obs
+            else:
+                pass
         # SB3 automatically resets environments on done and populates info["terminal_observation"]
         self._obs = np.array(obs_batch)
+        self._obs_tem=np.array(obs_term)
 
         # convert to tensors
         obs_tensor     = torch.tensor(self._obs,      dtype=torch.float32, device=self.device)
+        obs_term_tensor     = torch.tensor(self._obs_tem,      dtype=torch.float32, device=self.device)
         rewards_tensor = torch.tensor(reward_batch,    dtype=torch.float32, device=self.device)
         dones_tensor   = torch.tensor(done_batch,      dtype=torch.long,    device=self.device)
-        amp_tensor     = obs_tensor[:, 6:182]
         # import ipdb;ipdb.set_trace()
+        amp_tensor     = obs_term_tensor[:, 6:182]
         extras = {"observations": {"policy": obs_tensor,"amp": amp_tensor}}
         if not self.cfg.is_finite_horizon:
             truncated_flags = [

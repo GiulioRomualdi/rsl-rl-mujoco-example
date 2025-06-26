@@ -3,7 +3,11 @@ hydra:
     dir: .
   output_subdir: null
 env:
+<<<<<<< HEAD
   id: "MFG_MS_V9"
+=======
+  id: "MFG_MS_V8"
+>>>>>>> c9b6ad42e3a9b30832c69c39b872d6a2e99456ef
   num_envs: 64
 
 train:
@@ -57,9 +61,9 @@ train:
     # rnn_hidden_dim: 512
     # rnn_num_layers: 1
   discriminator:
-    use: false
+    use: true
     hidden_dims: [1024,512]
-    reward_scale: 1
+    reward_scale: 1.
     amploader:
       amp_data_path: "Env/data_test"
       dataset_names: null
@@ -67,4 +71,8 @@ train:
 
 seed: 0
 device: "cuda"
+<<<<<<< HEAD
 log_dir: "./logs/test_0626_env64_relative"
+=======
+log_dir: "./logs/64_amp"
+>>>>>>> c9b6ad42e3a9b30832c69c39b872d6a2e99456ef

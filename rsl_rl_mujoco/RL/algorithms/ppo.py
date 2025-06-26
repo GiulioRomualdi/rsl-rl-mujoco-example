@@ -32,7 +32,7 @@ class PPO:
         discriminator: Discriminator,
         amp_data: None,
         amp_normalizer: Optional[Any],
-        amp_replay_buffer_size: int = 100000,
+        amp_replay_buffer_size: int = 51200,
         use_smooth_ratio_clipping: bool = False,
         num_learning_epochs=1,
         num_mini_batches=1,
@@ -275,7 +275,7 @@ class PPO:
             mini_batch_size=(
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            //(self.num_mini_batches * 200),
+            //(self.num_mini_batches),
             allow_replacement=True,
         )
         amp_expert_generator = self.amp_data.feed_forward_generator(
@@ -283,7 +283,7 @@ class PPO:
             (
                 self.storage.num_envs * self.storage.num_transitions_per_env
             )
-            // (self.num_mini_batches * 200),
+            // (self.num_mini_batches * 400),
         )
         # import ipdb;ipdb.set_trace()# iterate over batches
         for (
@@ -420,6 +420,8 @@ class PPO:
             # Process AMP loss by unpacking policy and expert AMP samples.
             policy_state, policy_next_state = sample_amp_policy
             expert_state, expert_next_state = sample_amp_expert
+            policy_state_unnorm = torch.clone(policy_state)
+            expert_state_unnorm = torch.clone(expert_state)
             # print(policy_state.shape)
             # print(expert_state.shape)
             # import ipdb;ipdb.set_trace()
@@ -524,8 +526,8 @@ class PPO:
 
             # Update the normalizer with current policy and expert AMP observations.
             if self.amp_normalizer is not None:
-                self.amp_normalizer.update(policy_state)
-                self.amp_normalizer.update(expert_state)
+                self.amp_normalizer.update(policy_state_unnorm)
+                self.amp_normalizer.update(expert_state_unnorm)
             # Compute probabilities from the discriminator logits.
             # Store the losses
             mean_value_loss += value_loss.item()
