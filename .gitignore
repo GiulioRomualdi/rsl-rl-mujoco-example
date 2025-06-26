@@ -3,7 +3,7 @@ outputs/
 __pycache__/
 *.py[cod]
 *$py.class
-*.npz
+# *.npz
 # C extensions
 *.so
 *.pkl
