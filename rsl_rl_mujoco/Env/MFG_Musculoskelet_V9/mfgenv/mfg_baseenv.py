@@ -147,9 +147,11 @@ class BaseEnv(gym.Env):
             If render_mode == "rgb_array", returns the rendered image array (H, W, 3). Otherwise, None.
         """
         if self.render_mode is None:
-            # No rendering requested; close any existing viewer/renderer
-            if self.viewer is not None or self.renderer is not None:
+            if self.viewer or self.renderer:
                 self.close()
+            return None
+        
+        if not getattr(self, "auto_render", False):
             return None
 
         # First‐time creation of viewer/renderer

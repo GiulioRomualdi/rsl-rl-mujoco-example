@@ -55,6 +55,7 @@
 	
 	<worldbody>
 		<geom name="floor" pos="0 0 -0.01" size="0 0 0.125" type="plane" material="MatPlane" condim="3"/>
+		<camera name="fixed" pos="0 0 2" quat="1 0 0 0"/>
 		<body name="pelvis" pos="0 0 0.95" childclass="ZXY" quat="0.70710678 0.70710678 0.0 0.0">
 			<light mode="trackcom" castshadow="false" directional="false" pos="0 0 4.0" dir="0 0 -1"/>
 			<inertial pos="-0.0707 0 0" mass="11.777" fullinertia="0.1028 0.0871 0.0579 0 0 0"/>

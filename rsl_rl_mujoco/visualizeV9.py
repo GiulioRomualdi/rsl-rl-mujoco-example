@@ -2,7 +2,6 @@
 from collections import defaultdict
 import os
 import time
-import numpy as np
 import wandb
 import yaml
 import torch
@@ -12,13 +11,9 @@ from pathlib import Path
 from RL.modules import ActorCritic,EmpiricalNormalization
 from rsl_rl_mujoco.env_wrapper_eval import GymMujocoWrapper
 from pathlib import Path
-import imageio
 
 from Env.MFG_Musculoskelet_V9.mfgenv.ReferTraj_V7 import TrajectoryManager
 from Env.MFG_Musculoskelet_V9.mfgenv.mfg_MSenv import MFG_Musculoskeletal_V9
-from multiprocessing.managers import BaseManager
-
-
 
 class PolicyVisualizer:
     def __init__(self, cfg_path):
@@ -29,19 +24,18 @@ class PolicyVisualizer:
         self.obs_normalizer = EmpiricalNormalization(shape=[self.num_obs], until=1.0e8).to(self.device)
 
         self.load_policy()
+
     def load_config(self, cfg_path):
         """Load visualization configuration"""
         with open(cfg_path, 'r') as f:
             self.cfg = yaml.safe_load(f)
-        
-        # Set default device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def setup_environment(self):
         with open("Env\MFG_Musculoskelet_V9\cfg\mujocoenv_default.yaml", "r") as f:
             base_cfg = yaml.safe_load(f)
             
-        tm_args = base_cfg["traj_manager"]    # 直接拿，不 pop
+        tm_args = base_cfg["traj_manager"]    
         shared_tm =TrajectoryManager(
             data_path=tm_args["data_path"],
             sample_frequency=float(tm_args["sample_frequency"]),
@@ -49,15 +43,11 @@ class PolicyVisualizer:
             verbose=bool(tm_args["verbose"])
         )
 
-        # 4) **写回** shared_tm 到 config
         base_cfg["traj_manager"] = shared_tm
-        env_cfg = base_cfg
         
-        # Create base environment
-        self.env = gym.make(self.cfg["env"]["id"], env_kwargs={
-            "config": env_cfg,
-            "traj_manager": shared_tm
-        }
+        self.env = MFG_Musculoskeletal_V9(
+            config=base_cfg,
+            render_mode="human"
         )
         
         # Wrap for RSL-RL compatibility
@@ -66,7 +56,6 @@ class PolicyVisualizer:
             device=self.device,
             is_finite_horizon=False
         )
-
 
     def load_policy(self):
         """Load trained policy network"""

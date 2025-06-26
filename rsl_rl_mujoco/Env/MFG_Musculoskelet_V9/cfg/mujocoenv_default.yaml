@@ -6,18 +6,20 @@
 model_path: Env\MFG_Musculoskelet_V9\MFG_Raj2015_V9.xml
 default_frame_skip: 5
 render_mode: null
-# (Optional) override XML integrator timestep (seconds)
-timestep: 0.001
+auto_render: true
 # (Optional) which camera to use for offscreen rendering
 camera: 1
+# (Optional) override XML integrator timestep (seconds)
+timestep: 0.001
 use_muscle: false
+
 # --------------------------------------
 # Shared TrajectoryManager parameters
 # --------------------------------------
 traj_manager:
   data_path: Env\processed_trajs
   sample_frequency: 100
-  speed_range: [0.0, 3.0]
+  speed_range: [0.3, 3.0]
   verbose: false
   
 # --------------------------------------
@@ -32,10 +34,10 @@ reward_weights:
 # Imitation‐term sub‐weights
 # --------------------------------------
 imitation_weights:
-  site_pos: 0.79
-  site_vel: 0.01
-  joint_angle: 0.195
-  joint_angvel: 0.005
+  site_pos: 0.65
+  site_vel: 0.10
+  joint_angle: 0.20
+  joint_angvel: 0.05
 
 # --------------------------------------
 # Smoothness‐term sub‐weights
@@ -68,7 +70,7 @@ goal_switch_interval: 1.0      # seconds between goal updates
 # Episode
 # --------------------------------------
 max_episode_steps: 500
-relative_pelvis: false
+relative_pelvis: true
 
 # --------------------------------------
 # ReferenceTrajectories cursor settings

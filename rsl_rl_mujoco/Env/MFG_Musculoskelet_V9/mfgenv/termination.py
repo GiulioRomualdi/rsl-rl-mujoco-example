@@ -56,7 +56,7 @@ def check_termination(
         "has_fallen": lambda: _has_fallen(env),
         "site_deviation_exceeded": lambda: _site_deviation_exceeded(
             obs_components,
-            threshold=getattr(env, "site_threshold", 0.15)
+            threshold=getattr(env, "site_threshold", 0.25)
         ),
     }
     if conditions is None:

@@ -1,17 +1,17 @@
 # Visualization configuration
 env:
-  id: "MFG_MS_V8"  # MuJoCo environment ID
+  id: "MFG_MS_V9"  # MuJoCo environment ID
   render_mode: "human"  # "human", "rgb_array", or None
   width: 1280          # Render window width
   height: 720          # Render window height
 
 policy:
-  checkpoint: "model/amp_first_try/model_9600.pt"  # Path to trained policy
+  checkpoint: "logs/test_0626_env64_relative/model_2000.pt"  # Path to trained policy
   activation: "elu"
   hidden_dims: [1024,512, 512, 256]
 
 visualization:
-  num_episodes: 5000     # Number of episodes to run
+  num_episodes: 100     # Number of episodes to run
   speedup: 1         # Simulation speed multiplier (1.0 = real-time)
   wandb: false  # Save video to files
   video_dir: "videos"  # Where to save recordings

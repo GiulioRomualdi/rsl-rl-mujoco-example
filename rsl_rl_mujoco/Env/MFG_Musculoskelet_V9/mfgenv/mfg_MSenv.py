@@ -140,6 +140,8 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         
         # Base initialization (physics, action_space, base obs_space, rendering, seeding)
         super().__init__(config, render_mode=render_mode, **kwargs)
+        if self.render_mode is None:
+            self.auto_render = False
 
         # -------------------------------
         # Shared TrajectoryManager
@@ -468,7 +470,7 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         self.step_count += 1
         sim_time = self.step_count * self.opt_time * self.frame_skip
         
-        ref_kin = compute_ref_site_kinematics(self)
+        ref_kin = compute_ref_site_kinematics(self, include_orient_angvel=False)
         ref_pel = compute_ref_pelvis_kinematics(self, use_free_joint=True)
         
         comp_trim = {

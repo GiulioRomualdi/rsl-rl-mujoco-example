@@ -101,7 +101,9 @@ class MuJoCoEnv(BaseEnv):
         timestep    = config.get("timestep", None)
         camera      = config.get("camera", 0)
         use_muscle  = bool(config.get("use_muscle", False))
-        self.auto_render = bool(config.get("auto_render", True))
+        self.auto_render = bool(config.get("auto_render", False))
+        if rm is None:
+            self.auto_render = False
 
         # ---------------------------------------------------------------
         # Initialize BaseEnv (sets render_mode, metadata, seed stub)
@@ -369,7 +371,10 @@ class MuJoCoEnv(BaseEnv):
         Provide the camera index or name for offscreen rendering.
         Called by BaseEnv.render() in "rgb_array" mode.
         """
-        return self.camera
+        cam = self.camera
+        if cam >= self.model.ncam or cam < -1:
+            return -1
+        return cam
     
     def _clear_history(self) -> None:
         """
@@ -498,7 +503,7 @@ class MuJoCoEnv(BaseEnv):
         self._clear_history()
 
         # Update offscreen renderer if needed
-        if self.render_mode == "rgb_array":
+        if self.render_mode == "rgb_array" and self.renderer:
             self.renderer.update_scene(self.data)
 
         # Visualize this reset state
@@ -571,11 +576,11 @@ class MuJoCoEnv(BaseEnv):
         self.ctrl_history.append(action.copy())
 
         # Human‐mode camera follow
-        if self.render_mode == "human" and self.follow and self.viewer is not None:
+        if self.render_mode == "human" and self.follow and self.viewer:
             self.viewer.cam.lookat = self.data.qpos[:3]
 
         # Offscreen rendering update
-        if self.render_mode == "rgb_array":
+        if self.render_mode == "rgb_array" and self.renderer:
             self.renderer.update_scene(self.data)
 
         # Auto‐render if enabled

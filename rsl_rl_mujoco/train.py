@@ -17,6 +17,12 @@ from Env.MFG_Musculoskelet_V9.mfgenv.mfg_MSenv import MFG_Musculoskeletal_V9
 class TMProxyManager(BaseManager): pass
 TMProxyManager.register('TrajectoryManager', TrajectoryManager)
 
+gym.register(
+    id='MFG_MS_V9',
+    entry_point=MFG_Musculoskeletal_V9,
+    max_episode_steps=400
+)
+
 def print_total_mem(prefix=""):
     proc = psutil.Process(os.getpid())
     total = proc.memory_info().rss
@@ -35,12 +41,11 @@ def hydra_main(cfg):
 
     print_total_mem("Before VecEnv creation")
     envs = make_vec_env(
-        MFG_Musculoskeletal_V9,
+        env_id=env_id,
         n_envs=num_envs,
         vec_env_cls=SubprocVecEnv,
         env_kwargs={
             "config": env_cfg,
-            "traj_manager": shared_tm
         }
     )
     print_total_mem("After VecEnv creation")
@@ -68,7 +73,7 @@ if __name__ == "__main__":
     with open("Env\MFG_Musculoskelet_V9\cfg\mujocoenv_default.yaml", "r") as f:
         base_cfg = yaml.safe_load(f)
         
-    tm_args = base_cfg["traj_manager"]    # 直接拿，不 pop
+    tm_args = base_cfg["traj_manager"]
     shared_tm = manager.TrajectoryManager(
         data_path=tm_args["data_path"],
         sample_frequency=float(tm_args["sample_frequency"]),
@@ -76,12 +81,7 @@ if __name__ == "__main__":
         verbose=bool(tm_args["verbose"])
     )
 
-    # 4) **写回** shared_tm 到 config
     base_cfg["traj_manager"] = shared_tm
-
-    # 5) 这份带 proxy 的 config 传给子进程
-    global env_cfg
     env_cfg = base_cfg
 
-    # 6) 最后启动 Hydra / 并行环境
     hydra_main()
