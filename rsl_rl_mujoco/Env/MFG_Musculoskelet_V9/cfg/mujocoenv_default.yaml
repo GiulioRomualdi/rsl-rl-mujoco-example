@@ -69,7 +69,7 @@ goal_switch_interval: 1.0      # seconds between goal updates
 # --------------------------------------
 # Episode
 # --------------------------------------
-max_episode_steps: 500
+max_episode_steps: 1000
 relative_pelvis: true
 
 # --------------------------------------
