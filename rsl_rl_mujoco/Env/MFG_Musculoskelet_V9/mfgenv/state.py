@@ -885,16 +885,15 @@ def get_traj_info(
 
     stacked = np.vstack((qpos_all, qvel_all))
     future_both = np.take(stacked, idxs, axis=1)
-    n_qpos, n_qvel = qpos_all.shape[0], qvel_all.shape[0]
+    n_qpos = qpos_all.shape[0]
     future_qpos = future_both[:n_qpos, :]
-    future_qvel = future_both[n_qvel:, :]
+    future_qvel = future_both[n_qpos:, :]
 
     if center_root:
         root0 = qpos_all[0:3, current][:, None]  # (3,1)
         future_qpos[0:3, :] -= root0
     elif remove_root:
         future_qpos = future_qpos[3:, :]
-        future_qvel = future_qvel[3:, :]
 
     n_qpos2, _ = future_qpos.shape
     n_qvel2, _ = future_qvel.shape
@@ -1065,7 +1064,9 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     # 1) Pelvis
     try:
         pelvis_state, pelvis_comp = gp(env, use_free_joint=True)
-        pelvis_state = pelvis_state[2:]  # remove x, y
+        ref_pelvis = convert_ref_traj_qpos(env.ref_traj.get_qpos())
+        pelvis_state[0:3] = ref_pelvis[0:3] - pelvis_state[0:3]
+        # pelvis_state = pelvis_state[3:]  # remove x, y
     except Exception as e:
         raise ValueError(f"get_pelvis_kinematics failed: {e}")
 
@@ -1075,12 +1076,12 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     except Exception as e:
         raise ValueError(f"get_site_kinematics failed: {e}")
 
-    # 3) COM
-    try:
-        com_state, com_comp = gc(env)
-        com_state = com_state[2:]  # remove x, y
-    except Exception as e:
-        raise ValueError(f"get_COM_kinematics failed: {e}")
+    # # 3) COM
+    # try:
+    #     com_state, com_comp = gc(env)
+    #     # com_state = com_state[2:]  # remove x, y
+    # except Exception as e:
+    #     raise ValueError(f"get_COM_kinematics failed: {e}")
 
     # 4) GRF
     try:
@@ -1097,7 +1098,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
 
     # 6) Future trajectory
     try:
-        future_state, future_comp = gt(env, horizon=[2,3,5], center_root=True)
+        future_state, future_comp = gt(env, horizon=[2], remove_root=True)
     except Exception as e:
         raise ValueError(f"get_traj_info failed: {e}")
 
@@ -1105,7 +1106,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     sub_states: List[np.ndarray] = [
         pelvis_state,
         joint_state,
-        com_state,
+        # com_state,
         grf_state,
         foot_contacts,
         future_state
@@ -1128,7 +1129,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     components: Dict[str, Any] = {
         'pelvis':        pelvis_comp,
         'joint':         joint_comp,
-        'com':           com_comp,
+        # 'com':           com_comp,
         'grf':           grf_comp,
         'foot_contacts': foot_contacts,
         'traj':          future_comp
