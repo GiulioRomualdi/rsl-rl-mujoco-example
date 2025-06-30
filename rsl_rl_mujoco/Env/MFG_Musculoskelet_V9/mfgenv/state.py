@@ -798,7 +798,9 @@ def get_site_kinematics(
 
 def get_traj_info(
         env: Any, 
-        horizon: Optional[Union[int, List[int]]] = None
+        horizon: Optional[Union[int, List[int]]] = None,
+        remove_root: bool = False,
+        center_root: bool = False
         ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
     """
     Retrieve future reference-trajectory joint positions and velocities.
@@ -817,24 +819,29 @@ def get_traj_info(
           - ref_traj._pos          : int, current frame index
           - ref_traj.increment     : int, frames to advance per offset unit
           - ref_traj.traj_frames   : int, total frames in the trajectory
-    horizon : int or list of int, optional
-        Frame‐offsets ahead of the current frame to sample. If:
-          - None: defaults to [1]
-          - int: treated as [horizon]
-          - list of ints: treated as that list
-        Offsets may be zero or positive. They wrap around via modulo the
-        trajectory length.
+    horizon : int or list[int], optional
+        Frame offsets ahead of the current frame.  
+        None -> [1], int -> [horizon], list -> itself.
+    remove_root : bool, default=False
+        If True, **drop** the first three DOFs (pelvis x,y,z) from each future qpos/qvel.
+    center_root : bool, default=False
+        If True, **subtract** the current-frame pelvis position from all future qpos
+        (making root motion relative to the current root). Overrides remove_root.
 
     Returns
     -------
-    future_state : np.ndarray, shape=((n_dofs*len(horizon))*2,)
-        Concatenation of future_qpos.ravel() followed by future_qvel.ravel().
+    future_state : np.ndarray, shape=(n_qpos*m + n_qvel*m,)
+        Concatenation of future_qpos.ravel() then future_qvel.ravel().
     components : dict
         {
-          'future_qpos': ndarray, shape (n_dofs, m),
-          'future_qvel': ndarray, shape (n_dofs, m)
+          'future_qpos': ndarray, shape (n_qpos', m),
+          'future_qvel': ndarray, shape (n_qvel', m)
         }
-        where m = number of horizon offsets.
+        where m = number of offsets, and
+        n_qpos' = n_qpos    if not remove_root
+               = n_qpos-3  if remove_root
+               = n_qpos    if center_root (we keep dims but zero-center)
+        similarly for n_qvel'.
 
     Raises
     ------
@@ -857,10 +864,10 @@ def get_traj_info(
     if qpos_all.ndim != 2 or qvel_all.ndim != 2:
         raise ValueError(f"qpos and qvel must be 2D arrays; got {qpos_all.ndim}D and {qvel_all.ndim}D")
 
-    n_qpos, N1 = qpos_all.shape
-    n_qvel, N2 = qvel_all.shape
-    if N1 != total or N2 != total:
-        raise ValueError(f"qpos/qvel second dimension must equal traj_frames ({total}); got {N1}, {N2}")
+    T1 = qpos_all.shape[1]
+    T2 = qvel_all.shape[1]
+    if T1 != total or T2 != total:
+        raise ValueError(f"Expected traj_frames={total}, got qpos.shape[1]={T1}, qvel.shape[1]={T2}")
 
     if horizon is None:
         offsets = np.array([2], dtype=int)
@@ -872,23 +879,34 @@ def get_traj_info(
         offsets = np.array(horizon, dtype=int)
     else:
         raise ValueError("`horizon` must be None, int, or list/tuple of ints")
-
-    idxs = (current + offsets * incr) % total  # shape (m,)
-    m = idxs.size
-
-    future_qpos = np.take(qpos_all, idxs, axis=1)  # (n_dofs, m)
-    future_qvel = np.take(qvel_all, idxs, axis=1)  # (n_dofs, m)
-
-    len_pos = n_qpos * m
-    len_vel = n_qvel * m
-    future_state = np.empty(len_pos + len_vel, dtype=qpos_all.dtype)
     
-    future_state[0:len_pos]             = future_qpos.ravel(order='C')
-    future_state[len_pos:len_pos+len_vel] = future_qvel.ravel(order='C')
+    m = offsets.size
+    idxs = (current + offsets * incr) % total  # shape (m,)
+
+    stacked = np.vstack((qpos_all, qvel_all))
+    future_both = np.take(stacked, idxs, axis=1)
+    n_qpos, n_qvel = qpos_all.shape[0], qvel_all.shape[0]
+    future_qpos = future_both[:n_qpos, :]
+    future_qvel = future_both[n_qvel:, :]
+
+    if center_root:
+        root0 = qpos_all[0:3, current][:, None]  # (3,1)
+        future_qpos[0:3, :] -= root0
+    elif remove_root:
+        future_qpos = future_qpos[3:, :]
+        future_qvel = future_qvel[3:, :]
+
+    n_qpos2, _ = future_qpos.shape
+    n_qvel2, _ = future_qvel.shape
+    len_pos = n_qpos2 * m
+    len_vel = n_qvel2 * m
+    future_state = np.empty(len_pos + len_vel, dtype=qpos_all.dtype)
+    future_state[:len_pos]        = future_qpos.ravel(order='C')
+    future_state[len_pos:]        = future_qvel.ravel(order='C')
 
     components = {
-        "future_qpos": future_qpos,
-        "future_qvel": future_qvel
+        'future_qpos': future_qpos,
+        'future_qvel': future_qvel
     }
     return future_state, components
 
@@ -1047,6 +1065,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     # 1) Pelvis
     try:
         pelvis_state, pelvis_comp = gp(env, use_free_joint=True)
+        pelvis_state = pelvis_state[2:]  # remove x, y
     except Exception as e:
         raise ValueError(f"get_pelvis_kinematics failed: {e}")
 
@@ -1056,11 +1075,12 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     except Exception as e:
         raise ValueError(f"get_site_kinematics failed: {e}")
 
-    # # 3) COM
-    # try:
-    #     com_state, com_comp = gc(env)
-    # except Exception as e:
-    #     raise ValueError(f"get_COM_kinematics failed: {e}")
+    # 3) COM
+    try:
+        com_state, com_comp = gc(env)
+        com_state = com_state[2:]  # remove x, y
+    except Exception as e:
+        raise ValueError(f"get_COM_kinematics failed: {e}")
 
     # 4) GRF
     try:
@@ -1077,7 +1097,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
 
     # 6) Future trajectory
     try:
-        future_state, future_comp = gt(env)
+        future_state, future_comp = gt(env, horizon=[2,3,5], center_root=True)
     except Exception as e:
         raise ValueError(f"get_traj_info failed: {e}")
 
@@ -1085,7 +1105,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     sub_states: List[np.ndarray] = [
         pelvis_state,
         joint_state,
-        # com_state,
+        com_state,
         grf_state,
         foot_contacts,
         future_state
@@ -1108,7 +1128,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     components: Dict[str, Any] = {
         'pelvis':        pelvis_comp,
         'joint':         joint_comp,
-        # 'com':           com_comp,
+        'com':           com_comp,
         'grf':           grf_comp,
         'foot_contacts': foot_contacts,
         'traj':          future_comp

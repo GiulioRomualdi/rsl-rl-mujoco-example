@@ -11,7 +11,7 @@ train:
   num_learning_iterations: 10000 
   empirical_normalization: true
 
-  save_interval: 200  
+  save_interval: 500  
   experiment_name: Muscle_Skeleton
   run_name: "test"
 
@@ -57,7 +57,7 @@ train:
     # rnn_hidden_dim: 512
     # rnn_num_layers: 1
   discriminator:
-    use: true
+    use: false
     hidden_dims: [1024,512]
     reward_scale: 1.
     amploader:
@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/test_0626_env64_relative"
+log_dir: "./logs/test_0628_env64_relative_removeglobalpos"

@@ -6,7 +6,7 @@ env:
   height: 720          # Render window height
 
 policy:
-  checkpoint: "logs/test_0626_env64_relative/model_2000.pt"  # Path to trained policy
+  checkpoint: "logs/test_0626_env64_relative_traj3f&com/model_9999.pt"  # Path to trained policy
   activation: "elu"
   hidden_dims: [1024,512, 512, 256]
 
