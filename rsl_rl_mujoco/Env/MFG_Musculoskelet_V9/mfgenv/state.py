@@ -125,9 +125,10 @@ def compute_grf(body_id: int,
         xh = env.pelvis_heading
         yh = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
-        zh /= (np.linalg.norm(zh) + 1e-12)
+        zn = np.linalg.norm(zh)
+        zh /= (zn if zn > 1e-8 else 1.0)
         xh = np.cross(yh, zh)
-        xh /= (np.linalg.norm(xh) + 1e-12)
+        xh /= np.linalg.norm(xh)
         R = np.stack((xh, yh, zh), axis=1)  # world→pelvis basis
         Rw2l = R.T
         pos_local    = Rw2l.dot(contact_rel)
