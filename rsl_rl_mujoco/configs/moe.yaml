@@ -1,0 +1,74 @@
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+env:
+  id: "MFG_MS_V9"
+  num_envs: 64
+
+train:
+  num_steps_per_env: 400 
+  num_learning_iterations: 10000 
+  empirical_normalization: true
+
+  save_interval: 200  
+  experiment_name: Muscle_Skeleton
+  run_name: "test"
+
+  logger: wandb
+  wandb_project: Muscle_Skeleton
+
+  # -- load and resuming
+  load_run: -1  # -1 means load latest run
+  resume_path: null  # updated from load_run and checkpoint
+  checkpoint: -1  # -1 means load latest checkpoint
+  
+  algorithm:
+    class_name: PPO
+    normalize_advantage_per_mini_batch: false
+
+    value_loss_coef: 0.5
+    clip_param: 0.2
+    use_clipped_value_loss: true
+
+    desired_kl: 0.02
+    entropy_coef: 0.00
+    gamma: 0.99
+    lam: 0.95
+    max_grad_norm: 1.0
+
+    learning_rate: 0.0001
+    num_learning_epochs: 12
+    num_mini_batches: 16        
+    schedule: adaptive        
+
+  
+  policy:
+    class_name: ActorCriticMOE
+    moe:  
+      num_experts: 1
+      units: [256,256]
+      activation: relu
+      expert_path: model/32
+    activation: elu
+    actor_hidden_dims: [1024,512,512,256]
+    critic_hidden_dims: [1024,512,512,256]
+    init_noise_std: 0.1
+    noise_std_type: "scalar"  # 'scalar' or 'log'
+
+    # only needed for `ActorCriticRecurrent`
+    # rnn_type: 'lstm'
+    # rnn_hidden_dim: 512
+    # rnn_num_layers: 1
+  discriminator:
+    use: true
+    hidden_dims: [1024,512]
+    reward_scale: 1.
+    amploader:
+      amp_data_path: "Env/data_test"
+      dataset_names: null
+      dataset_weights: null
+
+seed: 0
+device: "cuda"
+log_dir: "./logs/test_0626_env64_relative"
