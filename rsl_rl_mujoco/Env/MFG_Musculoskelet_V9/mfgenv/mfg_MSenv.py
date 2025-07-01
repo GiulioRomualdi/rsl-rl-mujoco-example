@@ -308,6 +308,10 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
         except Exception as e:
             raise RuntimeError(f"get_state(self) failed: {e}")
         base_state = base_state.astype(np.float32, copy=False)
+
+        ref_qpos = self.ref_traj.get_qpos()
+        ref_qpos_free = convert_ref_traj_qpos(ref_qpos)
+        np.subtract(ref_qpos_free[:3], base_state[:3], out=base_state[:3])
         
         B = base_state.size
         obs = np.empty(2 + B, dtype=np.float32)

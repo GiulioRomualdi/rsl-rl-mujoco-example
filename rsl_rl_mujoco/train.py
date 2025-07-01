@@ -39,7 +39,7 @@ def hydra_main(cfg):
     env_id   = cfg["env"]["id"]
     num_envs = cfg["env"].get("num_envs", 4)
 
-    print_total_mem("Before VecEnv creation")
+    #print_total_mem("Before VecEnv creation")
     envs = make_vec_env(
         env_id=env_id,
         n_envs=num_envs,
@@ -48,7 +48,7 @@ def hydra_main(cfg):
             "config": env_cfg,
         }
     )
-    print_total_mem("After VecEnv creation")
+    #print_total_mem("After VecEnv creation")
 
     env = SB3RslVecEnv(
         envs,

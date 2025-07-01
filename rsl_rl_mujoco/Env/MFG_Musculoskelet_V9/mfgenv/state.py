@@ -122,14 +122,14 @@ def compute_grf(body_id: int,
     contact_rel = avg_contact - origin                        # (3,)
 
     if env.relative_pelvis:
-        xh = env.pelvis_heading
+        xh = env.pelvis_heading.astype(np.float64)
         yh = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         zh = np.cross(xh, yh)
         zn = np.linalg.norm(zh)
-        zh /= (zn if zn > 1e-8 else 1.0)
+        zh = zh / (zn if zn>1e-8 else 1.0)
         xh = np.cross(yh, zh)
         xh /= np.linalg.norm(xh)
-        R = np.stack((xh, yh, zh), axis=1)  # world→pelvis basis
+        R = np.stack([xh, yh, zh], axis=1)
         Rw2l = R.T
         pos_local    = Rw2l.dot(contact_rel)
         force_local  = Rw2l.dot(total_force)
@@ -1065,9 +1065,7 @@ def get_state(env: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
     # 1) Pelvis
     try:
         pelvis_state, pelvis_comp = gp(env, use_free_joint=True)
-        ref_pelvis = convert_ref_traj_qpos(env.ref_traj.get_qpos())
-        pelvis_state[0:3] = ref_pelvis[0:3] - pelvis_state[0:3]
-        # pelvis_state = pelvis_state[3:]  # remove x, y
+        # pelvis_state = pelvis_state[2:]  # remove x, y
     except Exception as e:
         raise ValueError(f"get_pelvis_kinematics failed: {e}")
 

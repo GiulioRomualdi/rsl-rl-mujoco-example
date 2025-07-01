@@ -67,4 +67,4 @@ train:
 
 seed: 0
 device: "cuda"
-log_dir: "./logs/test_0628_env64_relative_removeglobalpos"
+log_dir: "./logs/test_0630_env64_relative_test1"
