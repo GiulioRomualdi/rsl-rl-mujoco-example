@@ -523,6 +523,12 @@ class MFG_Musculoskeletal_V9(MuJoCoEnv):
             "Step %d | reward=%.4f | term=%s | trunc=%s",
             self.step_count, total_reward, terminated, truncated
         )
+        # if terminated:
+        #     print("speed = ", self.ref_traj.speed)
+        #     print(term_info)
+        # if truncated:
+        #     print("speed = ", self.ref_traj.speed)
+        #     print("truncated!!")
 
         return obs, total_reward, terminated, truncated, info
     

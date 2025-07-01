@@ -884,27 +884,24 @@ def get_traj_info(
     m = offsets.size
     idxs = (current + offsets * incr) % total  # shape (m,)
 
-    stacked = np.vstack((qpos_all, qvel_all))
-    future_both = np.take(stacked, idxs, axis=1)
-    n_qpos = qpos_all.shape[0]
-    future_qpos = future_both[:n_qpos, :]
-    future_qvel = future_both[n_qpos:, :]
+    future_qpos = np.take(qpos_all, idxs, axis=1).astype(np.float32, copy=False)
+    future_qvel = np.take(qvel_all, idxs, axis=1).astype(np.float32, copy=False)
 
     if center_root:
-        root0 = qpos_all[0:3, current][:, None]  # (3,1)
+        root0 = qpos_all[0:3, current].reshape(3, 1).astype(np.float32)
         future_qpos[0:3, :] -= root0
     elif remove_root:
         future_qpos = future_qpos[3:, :]
 
     n_qpos2, _ = future_qpos.shape
     n_qvel2, _ = future_qvel.shape
-    len_pos = n_qpos2 * m
-    len_vel = n_qvel2 * m
-    future_state = np.empty(len_pos + len_vel, dtype=qpos_all.dtype)
-    future_state[:len_pos]        = future_qpos.ravel(order='C')
-    future_state[len_pos:]        = future_qvel.ravel(order='C')
+    len_pos    = n_qpos2 * m
+    len_vel    = n_qvel2 * m
+    future_state = np.empty(len_pos + len_vel, dtype=np.float32)
+    future_state[0:len_pos] = future_qpos.ravel(order='C')
+    future_state[len_pos:]  = future_qvel.ravel(order='C')
 
-    components = {
+    components: Dict[str, np.ndarray] = {
         'future_qpos': future_qpos,
         'future_qvel': future_qvel
     }
