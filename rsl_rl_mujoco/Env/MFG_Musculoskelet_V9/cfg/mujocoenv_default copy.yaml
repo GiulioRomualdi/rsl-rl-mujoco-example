@@ -1,0 +1,92 @@
+# config.yaml
+
+# --------------------------------------
+# MuJoCoEnv / BaseEnv parameters
+# --------------------------------------
+model_path: Env\MFG_Musculoskelet_V9\MFG_Raj2015_V9.xml
+default_frame_skip: 5
+render_mode: null
+auto_render: true
+# (Optional) which camera to use for offscreen rendering
+camera: 1
+# (Optional) override XML integrator timestep (seconds)
+timestep: 0.001
+use_muscle: false
+
+# --------------------------------------
+# Shared TrajectoryManager parameters
+# --------------------------------------
+traj_manager:
+  data_path: Env\processed_trajs
+  sample_frequency: 100
+  speed_range: [0.3, 3.0]
+  verbose: false
+  
+# --------------------------------------
+# High‐level reward weights
+# --------------------------------------
+reward_weights:
+  imitation: 1.0
+  smooth: 0.0
+  goal: 0.0
+
+# --------------------------------------
+# Imitation‐term sub‐weights
+# --------------------------------------
+imitation_weights:
+  site_pos: 0.55
+  site_vel: 0.05
+  site_orient: 0.15
+  site_angvel: 0.05
+  joint_angle: 0.15
+  joint_angvel: 0.05
+
+# --------------------------------------
+# Smoothness‐term sub‐weights
+# --------------------------------------
+smooth_weights:
+  grf: 0.0
+  torque: 0.0
+  action: 1.0
+
+# --------------------------------------
+# Per‐term reward coefficients
+# --------------------------------------
+reward_coefficients:
+  site_pos: 20.0
+  site_vel: 0.05
+  site_orient: 1.0
+  site_angvel: 4e-3
+  joint_angle: 20.0
+  joint_angvel: 0.05
+  com_speed: 0.5
+  grf: 0.1
+  torque: 1e-6
+  action: 2.0
+
+# --------------------------------------
+# Reach‐goal parameters
+# --------------------------------------
+enable_reach_goal: false
+goal_switch_interval: 1.0      # seconds between goal updates
+
+# --------------------------------------
+# Episode
+# --------------------------------------
+max_episode_steps: 1000
+relative_pelvis: true
+
+# --------------------------------------
+# ReferenceTrajectories cursor settings
+# --------------------------------------
+increment: 2
+max_hold_steps: 5
+traj_seed: null
+rt_verbose: false
+
+# --------------------------------------
+# History buffer configuration
+# --------------------------------------
+enable_history: false
+short_history_max_len: 5
+long_history_max_len: 30

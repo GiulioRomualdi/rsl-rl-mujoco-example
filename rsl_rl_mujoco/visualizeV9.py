@@ -105,64 +105,7 @@ class PolicyVisualizer:
                 
                 # Control playback speed
                 time.sleep(1.0 / (self.env.max_episode_length * self.cfg["visualization"]["speedup"]))
-            speed=self.env.speed()
-            finish=not info["terminated_info"]['has_fallen'] and not info["terminated_info"]['site_deviation_exceeded'] 
-            print(speed)
-            print(info["terminated_info"])
-
-            if speed not in vel_dic.keys():
-                vel_dic[speed]=[0.,0.]
-            vel_dic[speed][0]+=1.
-            if finish:
-                vel_dic[speed][1]+=1.
-            print(f"Episode {episode + 1}: Reward = {episode_reward:.1f}")
             
-            # data=np.array(data).astype(np.float32)
-            
-            # # import ipdb;ipdb.set_trace()
-            # file_path = os.path.join(path ,f"data_{episode:02d}.npz")
-            # np.savez_compressed(file_path, **{"joint_position": data})
-            if self.cfg['visualization']["wandb"]:
-                bin_width = 0.1  # 你可以改成 1.0, 0.2 等
-                max_speed = 3.0
-
-                # 初始化桶
-                bucket = defaultdict(lambda: [0, 0])  # [count_sum, success_sum]
-
-                # 分桶统计
-                for speed, (count, success) in vel_dic.items():
-                    bin_index = int(speed // bin_width)
-                    bin_key = round(bin_index * bin_width, 2)
-                    bucket[bin_key][0] += count
-                    bucket[bin_key][1] += success
-
-                # 构造数据
-                bins = []
-                counts = []
-                successes = []
-                rates = []
-
-                # 保证x轴顺序
-                num_bins = int(max_speed // bin_width)
-                for i in range(num_bins):
-                    b = round(i * bin_width, 2)
-                    c, s = bucket[b]
-                    r = s / c if c > 0 else 0.0
-                    bins.append(f"{b:.1f}-{b+bin_width:.1f}")
-                    counts.append(c)
-                    successes.append(s)
-                    rates.append(r)
-                # Table 格式：每行一个区间
-                table_count = wandb.Table(data=list(zip(bins, counts)), columns=["speed_bin", "count"])
-                table_success = wandb.Table(data=list(zip(bins, successes)), columns=["speed_bin", "success"])
-                table_rate = wandb.Table(data=list(zip(bins, rates)), columns=["speed_bin", "success_rate"])
-
-                # 绘图
-                wandb.log({
-                    "Speed Bin vs Count": wandb.plot.bar(table_count, "speed_bin", "count", title="Speed Bin vs Count"),
-                    "Speed Bin vs Success": wandb.plot.bar(table_success, "speed_bin", "success", title="Speed Bin vs Success"),
-                    "Speed Bin vs Success Rate": wandb.plot.bar(table_rate, "speed_bin", "success_rate", title="Speed Bin vs Success Rate")
-                })
         self.env.close()
 
 def main():
