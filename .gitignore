@@ -1,11 +1,12 @@
+outputs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.npz
 # C extensions
 *.so
-
+*.pkl
 # Distribution / packaging
 .Python
 build/
@@ -128,11 +129,9 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+
 .venv
-env/
 venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -173,3 +172,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 **/logs
+*/wandb

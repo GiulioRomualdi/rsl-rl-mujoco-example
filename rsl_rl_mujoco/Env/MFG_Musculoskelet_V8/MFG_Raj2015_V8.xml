@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="Musculoskeletal_model">
+	<include file="Rajgopal_fullbody_mesh.xml"/>
+	<compiler angle="radian" balanceinertia="true" boundmass="0.001" boundinertia="0.001"/>
+	<visual>
+		<headlight ambient="0.6 0.6 0.6"/>
+		<rgba haze="0.35 0.45 0.55 1"/>
+		<global offwidth="800" offheight="800"/>
+	</visual>
+	<default>
+		<default class="ZXY">
+			<site rgba="1 0 0 1" size="0.01" group="1"/>
+			<joint armature="0.01" damping="1" frictionloss="0.0"/>
+			<position kp="1000" dampratio="1" inheritrange="1"/>
+			<default class="visual">
+				<geom group="2" contype="0" conaffinity="0" density="0"/>
+			</default>
+			<default class="collision">
+				<geom group="3" contype="1" conaffinity="0" rgba="0 0 1 0.5" friction="1 0.05 0.05" margin="0.001" solimp=".9 .99 .003" solref=".02 1" priority="1"/>
+			</default>
+		</default>	
+	</default>
+	<option gravity="0 0 -9.81" integrator="implicitfast" timestep="0.001" cone="elliptic" impratio="5"/>
+	<size njmax="1000" nconmax="400" nuser_jnt="1"/>
+	
+	<worldbody>
+		<geom name="floor" pos="0 0 -0.01" size="0 0 0.125" type="plane" material="MatPlane" condim="3"/>
+		<body name="pelvis" pos="0 0 0.95" childclass="ZXY" quat="0.70710678 0.70710678 0.0 0.0">
+			<light mode="trackcom" directional="false" pos="0 0 4.0" dir="0 0 -1"/>
+			<inertial pos="-0.0707 0 0" mass="11.777" fullinertia="0.1028 0.0871 0.0579 0 0 0"/>
+			<freejoint name="floating_base_joint"/>
+			<site name="pelvis_sensor" pos="0 0 0"/>
+			<geom class="visual" name="r_pelvis" type="mesh" mesh="r_pelvis"/>
+			<geom class="visual" name="l_pelvis" type="mesh" mesh="l_pelvis"/>
+			<geom class="visual" name="sacrum" type="mesh" mesh="sacrum"/>
+			<!--geom class="collision" name="C_sacrum" type="mesh" mesh="sacrum"/-->
+			<geom class="collision" name="C_pelvis1" type="ellipsoid" size=".110 .13 0.11" pos="-.08 -.03 0.07" euler="0.2 0 0"/>
+			<geom class="collision" name="C_pelvis2" type="ellipsoid" size=".110 .13 0.11" pos="-.08 -.03 -.07" euler="-.2 0 0"/>
+			<body name="femur_r" pos="-0.056276 -0.07849  0.07726" quat="1.0 0.0 0.0 0.0">
+				<inertial pos="0 -0.17 0" mass="9.3014" fullinertia="0.1339 0.0351 0.1412 0 0 0"/>
+				<joint name="hip_flexion_r" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-0.523599 2.0944" ref="0" actuatorfrcrange="-300 300"/>
+				<joint name="hip_adduction_r" type="hinge" pos="0 0 0" axis="1 0 0" limited="true" range="-0.872665 0.523599" ref="0" actuatorfrcrange="-200 200"/>
+				<joint name="hip_rotation_r" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-0.698132 0.698132" ref="0" actuatorfrcrange="-100 100"/>
+				<site name="femur_r_sensor" pos="0 0 0"/>
+				<geom class="visual" name="r_femur" type="mesh" mesh="r_femur"/>
+				<!--geom class="collision" name="C_r_femur" type="mesh" mesh="r_femur"/-->
+				<geom class="collision" name="C_r_femur1" type="capsule" size=".080" fromto="0 0 .02 0 -0.2 .015"/>
+				<geom class="collision" name="C_r_femur2" type="capsule" size=".067" fromto="0 -0.2 .015 0 -0.39 .005"/>
+				<body name="tibia_r" pos="0 -0.404425 -0.00126526" quat="1.0 0.0 0.0 0.0">
+					<inertial pos="0 -0.1867 0" mass="3.7075" fullinertia="0.0504 0.0051 0.0511 0 0 0"/>
+					<joint name="knee_angle_r" type="hinge" pos="0 0 0" axis="0.0 -0.0707131 -0.997497" limited="true" range="-0.05 2.0944" ref="0" actuatorfrcrange="-200 200"/>
+					<site name="tibia_r_sensor" pos="0 0 0"/>
+					<geom class="visual" name="r_tibia" type="mesh" mesh="r_tibia"/>
+					<geom class="visual" name="r_fibula" type="mesh" mesh="r_fibula"/>
+					<!--geom class="collision" name="C_r_tibia" type="mesh" mesh="r_tibia"/>
+					<geom class="collision" name="C_r_fibula" type="mesh" mesh="r_fibula"/-->
+					<geom class="collision" name="C_r_tibia1" type="capsule" size=".056" fromto="0 0 0 -0.01 -0.14 .0025"/>
+					<geom class="collision" name="C_r_tibia2" type="capsule" size=".048" fromto="-0.01 -0.14 .0025 -0.01 -0.35 .005"/>
+					<body name="talus_r" pos="-0.01 -0.4 0" quat="1.0 0.0 0.0 0.0">
+						<inertial pos="0 0 0" mass="0.1" fullinertia="0.001 0.001 0.001 0 0 0"/>
+						<joint name="ankle_angle_r" type="hinge" pos="0 0 0" axis="-0.105014 -0.174022 0.979126" limited="true" range="-0.698132 0.523599" ref="0" actuatorfrcrange="-150 150"/>
+						<site name="talus_r_sensor" pos="0 0 0"/>
+						<geom class="visual" name="r_talus" type="mesh" mesh="r_talus"/>
+						<!--geom class="collision" name="C_r_talus" type="mesh" mesh="r_talus"/-->
+						<body name="calcn_r" pos="-0.04877 -0.04195 0.00792" quat="1.0 0.0 0.0 0.0">
+							<inertial pos="0.1 0.03 0" mass="1.25" fullinertia="0.0014 0.0039 0.0041 0 0 0"/>
+							<joint name="subtalar_angle_r" type="hinge" pos="0 0 0" axis="0.78718 0.604747 -0.120949" limited="true" range="-0.349066 0.349066" ref="0" actuatorfrcrange="-50 50"/>
+							<site name="calcn_r_sensor" pos="0 0 0"/>
+							<geom class="visual" name="r_foot" type="mesh" mesh="r_foot"/>
+							<!--geom class="collision" name="C_r_foot" type="mesh" mesh="r_foot"/-->
+							<!--geom class="collision" name="C_r_foot" type="box" pos="0.08 0.012 0" quat="0.9975641 0 -0.06975647 0" size="0.085 0.02 0.042"/-->
+							<geom class="collision" name="C_r_foot1" type="capsule" size=".02" fromto="0.175 0 -.03 0.010 0 -.01"/>
+							<!-- <geom class="collision" name="C_r_foot2" type="capsule" size=".02" fromto="0.155 0 0.00 0.010 0 0.00"/> -->
+							<geom class="collision" name="C_r_foot3" type="capsule" size=".02" fromto="0.140 0 0.03 0.010 0 0.01"/>
+							<geom class="collision" name="C_r_foot4" type="ellipsoid" size=".085 .035 0.04" pos="0.08 .02 0" euler="0 0 -.2"/>
+							<site name="RCAL" pos="0.005 -0.005 -0.01"/>
+							<body name="toes_r" pos="0.1788 -0.002 0.00108" quat="1.0 0.0 0.0 0.0">
+								<inertial pos="0.0346 0.006 -0.0175" mass="0.2166" fullinertia="0.0001 0.0002 0.001 0 0 0"/>
+								<joint name="mtp_angle_r" type="hinge" pos="0 0 0" axis="0.580954 0.0 -0.813936" limited="true" range="-0.523599 0.523599" ref="0" actuatorfrcrange="-2 2"/>
+								<site name="toes_r_sensor" pos="0 0 0"/>
+								<geom class="visual" name="r_bofoot" type="mesh" mesh="r_bofoot"/>
+								<!--geom class="collision" name="C_r_bofoot" type="mesh" mesh="r_bofoot"/-->
+								<!--geom class="collision" name="C_r_bofoot1" type="box" pos="0.03 0.002 -0.01" quat="0.9993908 0 -0.0348995 0" size="0.03 0.01 0.02"/>
+								<geom class="collision" name="C_r_bofoot2" type="box" pos="0.024 0.002 0.038" quat="0.9945219 0 -0.1045285 0" size="0.03 0.01 0.02"/-->
+								<geom class="collision" name="C_r_bofoot1" size=".0175 .045" type="capsule" zaxis="0.880954 0 -0.813936" pos="0.04 0 .01"/>
+								<geom class="collision" name="C_r_bofoot2" size=".02 .040" type="capsule" zaxis="0.580954 0 -0.813936" pos="0.01 0 0"/>
+								<site name="RTJC" pos="0.05 -0.005 -0.005"/>
+							</body>
+						</body>
+					</body>
+				</body>
+			</body>
+			<body name="femur_l" pos="-0.056276 -0.07849 -0.07726" quat="1.0 0.0 0.0 0.0">
+				<inertial pos="0 -0.17 0" mass="9.3014" fullinertia="0.1339 0.0351 0.1412 0 0 0"/>
+				<joint name="hip_flexion_l" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-0.523599 2.0944" ref="0" actuatorfrcrange="-300 300"/>
+				<joint name="hip_adduction_l" type="hinge" pos="0 0 0" axis="-1 0 0" limited="true" range="-0.872665 0.523599" ref="0" actuatorfrcrange="-200 200"/>
+				<joint name="hip_rotation_l" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-0.698132 0.698132" ref="0" actuatorfrcrange="-100 100"/>
+				<site name="femur_l_sensor" pos="0 0 0"/>
+				<geom class="visual" name="l_femur" type="mesh" mesh="l_femur"/>
+				<!--geom class="collision" name="l_femur" type="mesh" mesh="l_femur"/-->
+				<geom class="collision" name="C_l_femur1" type="capsule" size=".080" fromto="0 0 -.02 0 -0.2 -.015"/>
+				<geom class="collision" name="C_l_femur2" type="capsule" size=".067" fromto="0 -0.2 -.015 0 -0.39 -.005"/>
+				<body name="tibia_l" pos="0 -0.404425 0.00126526" quat="1.0 0.0 0.0 0.0">
+					<inertial pos="0 -0.1867 0" mass="3.7075" fullinertia="0.0504 0.0051 0.0511 0 0 0"/>
+					<joint name="knee_angle_l" type="hinge" pos="0 0 0" axis="0.0 0.0707131 -0.997497" limited="true" range="-0.05 2.0944" ref="0" actuatorfrcrange="-200 200"/>
+					<site name="tibia_l_sensor" pos="0 0 0"/>
+					<geom class="visual" name="l_tibia" type="mesh" mesh="l_tibia"/>
+					<geom class="visual" name="l_fibula" type="mesh" mesh="l_fibula"/>
+					<!--geom class="collision" name="l_tibia" type="mesh" mesh="l_tibia"/>
+					<geom class="collision" name="l_fibula" type="mesh" mesh="l_fibula"/-->
+					<geom class="collision" name="C_l_tibia1" type="capsule" size=".056" fromto="0 0 0 -0.01 -0.14 -.0025"/>
+					<geom class="collision" name="C_l_tibia2" type="capsule" size=".048" fromto="-0.01 -0.14 -.0025 -0.01 -0.35 -.005"/>
+					<body name="talus_l" pos="-0.01 -0.4 0" quat="1.0 0.0 0.0 0.0">
+						<inertial pos="0 0 0" mass="0.1" fullinertia="0.001 0.001 0.001 0 0 0"/>
+						<joint name="ankle_angle_l" type="hinge" pos="0 0 0" axis="0.105014 0.174022 0.979126" limited="true" range="-0.698132 0.523599" ref="0" actuatorfrcrange="-150 150"/>
+						<site name="talus_l_sensor" pos="0 0 0"/>
+						<geom class="visual" name="l_talus" type="mesh" mesh="l_talus"/>
+						<!--geom class="collision" name="l_talus" type="mesh" mesh="l_talus"/-->
+						<body name="calcn_l" pos="-0.04877 -0.04195 -0.00792" quat="1.0 0.0 0.0 0.0">
+							<inertial pos="0.1 0.03 0" mass="1.25" fullinertia="0.0014 0.0039 0.0041 0 0 0"/>
+							<joint name="subtalar_angle_l" type="hinge" pos="0 0 0" axis="-0.78718 -0.604747 -0.120949" limited="true" range="-0.349066 0.349066" ref="0" actuatorfrcrange="-50 50"/>
+							<site name="calcn_l_sensor" pos="0 0 0"/>
+							<geom class="visual" name="l_foot" type="mesh" mesh="l_foot"/>
+							<!--geom class="collision" name="C_l_foot" type="box" pos="0.08 0.012 0" quat="0.9975641 0 0.06975647 0" size="0.085 0.02 0.042"/-->
+							<geom class="collision" name="C_l_foot1" type="capsule" size=".02" fromto="0.175 0 0.03 0.010 0 0.01"/>
+							<!-- <geom class="collision" name="C_l_foot2" type="capsule" size=".02" fromto="0.155 0 0.00 0.010 0 0.00"/> -->
+							<geom class="collision" name="C_l_foot3" type="capsule" size=".02" fromto="0.140 0 -.03 0.010 0 -.01"/>
+							<geom class="collision" name="C_l_foot4" type="ellipsoid" size=".085 .035 0.04" pos="0.08 .02 0" euler="0 0 -.2"/>
+							<site name="LCAL" pos="0.005 -0.005 0.01"/>
+							<body name="toes_l" pos="0.1788 -0.002 -0.00108" quat="1.0 0.0 0.0 0.0">
+								<inertial pos="0.0346 0.006 0.0175" mass="0.2166" fullinertia="0.0001 0.0002 0.001 0 0 0"/>
+								<joint name="mtp_angle_l" type="hinge" pos="0 0 0" axis="-0.580954 0.0 -0.813936" limited="true" range="-0.523599 0.523599" ref="0" actuatorfrcrange="-2 2"/>
+								<site name="toes_l_sensor" pos="0 0 0"/>
+								<geom class="visual" name="l_bofoot" type="mesh" mesh="l_bofoot"/>
+								<!--geom class="collision" name="l_bofoot" type="mesh" mesh="l_bofoot"/-->
+								<!--geom class="collision" name="C_l_bofoot1" type="box" pos="0.03 0.002 0.01" quat="0.9993908 0 0.0348995 0" size="0.03 0.01 0.02"/>
+								<geom class="collision" name="C_l_bofoot2" type="box" pos="0.024 0.002 -0.038" quat="0.9945219 0 0.1045285 0" size="0.03 0.01 0.02"/-->
+								<geom class="collision" name="C_l_bofoot1" type="capsule" size=".0175 .045" zaxis="-0.880954 0 -0.813936" pos="0.04 0 -.01"/>
+								<geom class="collision" name="C_l_bofoot2" type="capsule" size=".02 .040" zaxis="-0.580954 0 -0.813936" pos="0.01 0 0"/>
+								<site name="LTJC" pos="0.05 -0.005 0.005"/>
+							</body>
+						</body>
+					</body>
+				</body>
+			</body>
+			<body name="torso" pos="-0.1007 0.0815 0" quat="1.0 0.0 0.0 0.0">
+				<inertial pos="-0.03 0.32 0" mass="26.8266" fullinertia="1.4745 0.7555 1.4314 0 0 0"/>
+				<joint name="lumbar_extension" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-1.047198 1.047198" ref="0" actuatorfrcrange="-200 200"/>
+				<joint name="lumbar_bending" type="hinge" pos="0 0 0" axis="1 0 0" limited="true" range="-1.047198 1.047198" ref="0" actuatorfrcrange="-200 200"/>
+				<joint name="lumbar_rotation" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-0.52 0.52" ref="0" actuatorfrcrange="-100 100"/>
+				<site name="torso_sensor" pos="0 0 0"/>
+				<geom class="visual" name="hat_spine" type="mesh" mesh="hat_spine"/>
+				<geom class="visual" name="hat_jaw" type="mesh" mesh="hat_jaw"/>
+				<geom class="visual" name="hat_skull" type="mesh" mesh="hat_skull"/>
+				<geom class="visual" name="hat_ribs_scap" type="mesh" mesh="hat_ribs_scap"/>
+				<site name="head_sensor" pos="0.01 0.56 0.00"/>
+				<body name="humerus_r" pos="0.003155 0.3715 0.17" quat="1.0 0.0 0.0 0.0">
+					<inertial pos="0 -0.164502 0" mass="2.0325" fullinertia="0.011946 0.004121 0.013409 0 0 0"/>
+					<joint name="arm_flex_r" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-1.5708 1.5708" ref="0" actuatorfrcrange="-80 80"/>
+					<joint name="arm_add_r" type="hinge" pos="0 0 0" axis="1 0 0" limited="true" range="-2.0944 0.523599" ref="0" actuatorfrcrange="-80 80"/>
+					<joint name="arm_rot_r" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-1.5708 1.5708" ref="0" actuatorfrcrange="-50 50"/>
+					<site name="humerus_r_sensor" pos="0 0 0"/>
+					<geom class="visual" name="humerus_rv" type="mesh" mesh="humerus_rv"/>
+					<body name="ulna_r" pos="0.013144 -0.286273 -0.009595" quat="1.0 0.0 0.0 0.0">
+						<inertial pos="0 -0.120525 0" mass="0.6075" fullinertia="0.002962 0.000618 0.003213 0 0 0"/>
+						<joint name="elbow_flex_r" type="hinge" pos="0 0 0" axis="0.226047 0.022269 0.973862" limited="true" range="0 2.617994" ref="0" actuatorfrcrange="-40 40"/>
+						<site name="ulna_r_sensor" pos="0 0 0"/>
+						<geom class="visual" name="ulna_rv" type="mesh" mesh="ulna_rv"/>
+						<body name="radius_r" pos="-0.006727 -0.013007 0.026083" quat="1.0 0.0 0.0 0.0">
+							<inertial pos="0 -0.120525 0" mass="0.6075" fullinertia="0.002962 0.000618 0.003213 0 0 0"/>
+							<joint name="pro_sup_r" type="hinge" pos="0 0 0" axis="0.056398 0.998406 0.001952" limited="true" range="0 2.617994" ref="0" actuatorfrcrange="-20 20"/>
+							<geom class="visual" name="radius_rv" type="mesh" mesh="radius_rv"/>
+							<body name="hand_r" pos="-0.008797 -0.235841  0.01361" quat="1.0 0.0 0.0 0.0">
+								<inertial pos="0 -0.068095 0" mass="0.4575" fullinertia="0.000892 0.000547 0.00134 0 0 0"/>
+								<joint name="wrist_flex_r" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-1.22173 1.22173" ref="0" actuatorfrcrange="-15 15"/>
+								<joint name="wrist_dev_r" type="hinge" pos="0 0 0" axis="1 0 0" limited="true" range="-0.436332 0.610865" ref="0" actuatorfrcrange="-10 10"/>
+								<site name="hand_r_sensor" pos="0 0 0"/>
+								<geom class="visual" name="hand_r_simplified" type="sphere" pos="0 -0.04 0" size="0.04"/>
+							</body>
+						</body>
+					</body>
+				</body>
+				<body name="humerus_l" pos="0.003155 0.3715 -0.17" quat="1.0 0.0 0.0 0.0">
+					<inertial pos="0 -0.164502 0" mass="2.0325" fullinertia="0.011946 0.004121 0.013409 0 0 0"/>
+					<joint name="arm_flex_l" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-1.5708 1.5708" ref="0" actuatorfrcrange="-80 80"/>
+					<joint name="arm_add_l" type="hinge" pos="0 0 0" axis="-1 0 0" limited="true" range="-2.0944 0.523599" ref="0" actuatorfrcrange="-80 80"/>
+					<joint name="arm_rot_l" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-1.5708 1.5708" ref="0" actuatorfrcrange="-50 50"/>
+					<site name="humerus_l_sensor" pos="0 0 0"/>
+					<geom class="visual" name="humerus_lv" type="mesh" mesh="humerus_lv"/>
+					<body name="ulna_l" pos="0.013144 -0.286273 0.009595" quat="1.0 0.0 0.0 0.0">
+						<inertial pos="0 -0.120525 0" mass="0.6075" fullinertia="0.002962 0.000618 0.003213 0 0 0"/>
+						<joint name="elbow_flex_l" type="hinge" pos="0 0 0" axis="-0.226047 -0.022269 0.973862" limited="true" range="0 2.617994" ref="0" actuatorfrcrange="-40 40"/>
+						<site name="ulna_l_sensor" pos="0 0 0"/>
+						<geom class="visual" name="ulna_lv" type="mesh" mesh="ulna_lv"/>
+						<body name="radius_l" pos="-0.006727 -0.013007 -0.026083" quat="1.0 0.0 0.0 0.0">
+							<inertial pos="0 -0.120525 0" mass="0.6075" fullinertia="0.002962 0.000618 0.003213 0 0 0"/>
+							<joint name="pro_sup_l" type="hinge" pos="0 0 0" axis="-0.056398 -0.998406 0.001952" limited="true" range="0 2.617994" ref="0" actuatorfrcrange="-20 20"/>
+							<geom class="visual" name="radius_lv" type="mesh" mesh="radius_lv"/>
+							<body name="hand_l" pos="-0.008797 -0.235841 -0.01361" quat="1.0 0.0 0.0 0.0">
+								<inertial pos="0 -0.068095 0" mass="0.4575" fullinertia="0.000892 0.000547 0.00134 0 0 0"/>
+								<joint name="wrist_flex_l" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-1.22173 1.22173" ref="0" actuatorfrcrange="-15 15"/>
+								<joint name="wrist_dev_l" type="hinge" pos="0 0 0" axis="-1 0 0" limited="true" range="-0.436332 0.610865" ref="0" actuatorfrcrange="-10 10"/>
+								<site name="hand_l_sensor" pos="0 0 0"/>
+								<geom class="visual" name="hand_l_simplified" type="sphere" pos="0 -0.04 0" size="0.04"/>
+							</body>
+						</body>
+					</body>
+				</body>
+			</body>
+		</body>
+		<camera name="for_testing" pos="0 0 0" euler="0 0 0"/>
+	</worldbody>
+	
+	<asset>
+		<texture type="skybox" builtin="gradient" rgb1=".6 .8 1.0" rgb2="0 0 0" width="512" height="512"/>
+		<texture name="texplane" type="2d" builtin="checker" rgb2=".6 .7 .8" rgb1=".5 .6 .7" width="100" height="100"/>
+		<material name="MatPlane" reflectance="0.2" texture="texplane" texrepeat="1 1" texuniform="true"/>
+	</asset>
+		
+	<actuator>
+		<position class="ZXY" name="hip_flexion_r" joint="hip_flexion_r" kp="2500"/>
+		<position class="ZXY" name="hip_adduction_r" joint="hip_adduction_r" kp="2000"/>
+		<position class="ZXY" name="hip_rotation_r" joint="hip_rotation_r" kp="1000"/>
+		<position class="ZXY" name="knee_angle_r" joint="knee_angle_r" kp="1800"/>
+		<position class="ZXY" name="ankle_angle_r" joint="ankle_angle_r" kp="1000"/>
+		<position class="ZXY" name="subtalar_angle_r" joint="subtalar_angle_r" kp="600"/>
+		<position class="ZXY" name="mtp_angle_r" joint="mtp_angle_r" kp="20"/>
+		
+		<position class="ZXY" name="hip_flexion_l" joint="hip_flexion_l" kp="2500"/>
+		<position class="ZXY" name="hip_adduction_l" joint="hip_adduction_l" kp="2000"/>
+		<position class="ZXY" name="hip_rotation_l" joint="hip_rotation_l" kp="1000"/>
+		<position class="ZXY" name="knee_angle_l" joint="knee_angle_l" kp="1800"/>
+		<position class="ZXY" name="ankle_angle_l" joint="ankle_angle_l" kp="1000"/>
+		<position class="ZXY" name="subtalar_angle_l" joint="subtalar_angle_l" kp="600"/>
+		<position class="ZXY" name="mtp_angle_l" joint="mtp_angle_l" kp="20"/>
+		
+		<position class="ZXY" name="lumbar_extension" joint="lumbar_extension" kp="1500"/>
+		<position class="ZXY" name="lumbar_bending" joint="lumbar_bending" kp="1500"/>
+		<position class="ZXY" name="lumbar_rotation" joint="lumbar_rotation" kp="800"/>
+		
+		<position class="ZXY" name="arm_flex_r" joint="arm_flex_r" kp="800"/>
+		<position class="ZXY" name="arm_add_r" joint="arm_add_r" kp="800"/>
+		<position class="ZXY" name="arm_rot_r" joint="arm_rot_r" kp="500"/>
+		<position class="ZXY" name="elbow_flex_r" joint="elbow_flex_r" kp="200"/>
+		<position class="ZXY" name="pro_sup_r" joint="pro_sup_r" kp="200"/>
+		<position class="ZXY" name="wrist_flex_r" joint="wrist_flex_r" kp="100"/>
+		<position class="ZXY" name="wrist_dev_r" joint="wrist_dev_r" kp="50"/>
+		
+		<position class="ZXY" name="arm_flex_l" joint="arm_flex_l" kp="800"/>
+		<position class="ZXY" name="arm_add_l" joint="arm_add_l" kp="800"/>
+		<position class="ZXY" name="arm_rot_l" joint="arm_rot_l" kp="500"/>
+		<position class="ZXY" name="elbow_flex_l" joint="elbow_flex_l" kp="200"/>
+		<position class="ZXY" name="pro_sup_l" joint="pro_sup_l" kp="200"/>
+		<position class="ZXY" name="wrist_flex_l" joint="wrist_flex_l" kp="100"/>
+		<position class="ZXY" name="wrist_dev_l" joint="wrist_dev_l" kp="50"/>
+	</actuator>
+	
+	<equality>
+	</equality>
+	
+	<contact>
+	</contact>
+	
+	<sensor>
+		<framepos name="pelvis_1" objtype="site" objname="pelvis_sensor"/>
+		<velocimeter name="pelvis_sensor" site="pelvis_sensor"/>
+		
+		<velocimeter name="femur_r_sensor" site="femur_r_sensor"/>
+		<velocimeter name="tibia_r_sensor" site="tibia_r_sensor"/>
+		<velocimeter name="talus_r_sensor" site="talus_r_sensor"/>
+		<velocimeter name="calcn_r_sensor" site="calcn_r_sensor"/>
+		<velocimeter name="toes_r_sensor" site="toes_r_sensor"/>
+		
+		<velocimeter name="femur_l_sensor" site="femur_l_sensor"/>
+		<velocimeter name="tibia_l_sensor" site="tibia_l_sensor"/>
+		<velocimeter name="talus_l_sensor" site="talus_l_sensor"/>
+		<velocimeter name="calcn_l_sensor" site="calcn_l_sensor"/>
+		<velocimeter name="toes_l_sensor" site="toes_l_sensor"/>
+		
+		<velocimeter name="torso_sensor" site="torso_sensor"/>
+		<velocimeter name="head_sensor" site="head_sensor"/>
+		
+		<velocimeter name="humerus_r_sensor" site="humerus_r_sensor"/>
+		<velocimeter name="ulna_r_sensor" site="ulna_r_sensor"/>
+		<velocimeter name="hand_r_sensor" site="hand_r_sensor"/>
+		
+		<velocimeter name="humerus_l_sensor" site="humerus_l_sensor"/>
+		<velocimeter name="ulna_l_sensor" site="ulna_l_sensor"/>
+		<velocimeter name="hand_l_sensor" site="hand_l_sensor"/>
+	</sensor>
+	
+	<keyframe>
+	</keyframe>
+</mujoco>
+
+

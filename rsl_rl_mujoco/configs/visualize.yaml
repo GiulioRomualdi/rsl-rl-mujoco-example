@@ -1,17 +1,17 @@
 # Visualization configuration
 env:
-  id: "HalfCheetah-v5"  # MuJoCo environment ID
+  id: "MFG_MS_V9"  # MuJoCo environment ID
   render_mode: "human"  # "human", "rgb_array", or None
   width: 1280          # Render window width
   height: 720          # Render window height
 
 policy:
-  checkpoint: "logs/model_400.pt"  # Path to trained policy
+  checkpoint: "logs/test_0626_env64_relative_traj3f&com/model_9999.pt"  # Path to trained policy
   activation: "elu"
-  hidden_dims: [64, 64]
+  hidden_dims: [1024,512, 512, 256]
 
 visualization:
-  num_episodes: 10     # Number of episodes to run
-  speedup: 0.1         # Simulation speed multiplier (1.0 = real-time)
-  record_video: False  # Save video to files
+  num_episodes: 100     # Number of episodes to run
+  speedup: 1         # Simulation speed multiplier (1.0 = real-time)
+  wandb: false  # Save video to files
   video_dir: "videos"  # Where to save recordings

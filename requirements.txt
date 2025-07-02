@@ -1,0 +1,23 @@
+torchvision
+torch
+pyquaternion
+pyyaml
+rospkg
+pexpect
+mujoco #==3.3
+numba
+#dm_control==1.0.14
+opencv-python
+matplotlib
+einops
+packaging
+h5py
+ipython
+ipdb
+wandb
+pandas
+stable-baselines3[extra]
+gym
+scipy
+numpy-quaternion
+hydra-core 

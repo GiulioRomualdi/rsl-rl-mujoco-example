@@ -1,0 +1,108 @@
+# Copyright (c) 2025, Istituto Italiano di Tecnologia
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+import torch
+import torch.nn as nn
+from torch import autograd
+
+
+class Discriminator(nn.Module):
+    """Discriminator implements the discriminator network for the AMP algorithm.
+
+    This network is trained to distinguish between expert and policy-generated data.
+    It also provides reward signals for the policy through adversarial learning.
+
+    Args:
+        input_dim (int): Dimension of the concatenated input state (state + next state).
+        hidden_layer_sizes (list): List of hidden layer sizes.
+        reward_scale (float): Scale factor for the computed reward.
+        device (str): Device to run the model on ('cpu' or 'cuda').
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_layer_sizes: list[int],
+        reward_scale: float = 1.,
+        reward_clamp_epsilon: float = 0.0001,
+        device: str = "cpu",
+    ):
+        super(Discriminator, self).__init__()
+
+        self.device = device
+        self.input_dim = input_dim
+        self.reward_scale = reward_scale
+        self.reward_clamp_epsilon = reward_clamp_epsilon
+        layers = []
+        curr_in_dim = input_dim
+
+        for hidden_dim in hidden_layer_sizes:
+            layers.append(nn.Linear(curr_in_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            curr_in_dim = hidden_dim
+
+        self.trunk = nn.Sequential(*layers).to(device)
+        self.linear = nn.Linear(hidden_layer_sizes[-1], 1).to(device)
+        self.alpha=torch.pi
+        self.trunk.train()
+        self.linear.train()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the discriminator.
+
+        Args:
+            x (Tensor): Input tensor (batch_size, input_dim).
+
+        Returns:
+            Tensor: Discriminator output logits.
+        """
+        h = self.trunk(x)
+        d = self.linear(h)
+        return d
+
+    def compute_grad_pen(
+        self,
+        expert_state: torch.Tensor,
+        expert_next_state: torch.Tensor,
+        lambda_: float = 10,
+    ) -> torch.Tensor:
+        expert_data = torch.cat([expert_state, expert_next_state], dim=-1)
+        expert_data.requires_grad = True
+
+        disc = self.linear(self.trunk(expert_data))
+        ones = torch.ones(disc.size(), device=disc.device)
+        grad = autograd.grad(
+            outputs=disc, inputs=expert_data,
+            grad_outputs=ones, create_graph=True,
+            retain_graph=True, only_inputs=True)[0]
+
+        # Enforce that the 
+        # grad norm approaches 0.
+        grad_pen = lambda_ * (grad.norm(2, dim=1) - 0).pow(2).mean()
+        return grad_pen
+
+    def predict_reward(
+        self,
+        state: torch.Tensor,
+        next_state: torch.Tensor,
+        normalizer=None,
+    ) -> torch.Tensor:
+
+        with torch.no_grad():
+            if normalizer is not None:
+                state = normalizer.normalize(state)
+                next_state = normalizer.normalize(next_state)
+
+            d = self.forward(torch.cat([state, next_state], dim=-1))
+            d = torch.clamp(d,min=-1.,max=1.)
+            # reward = self.reward_scale * torch.clamp(1 - (1/4) * torch.square(d - 1), min=0)
+            reward = torch.clamp(
+                    self.reward_scale
+                    * torch.log1p(self.alpha * (d + 1))
+                    / torch.log1p(torch.tensor(2 * self.alpha, device=d.device)),
+                    min=0.0,
+                    max=1.0
+                )
+            return reward.squeeze()

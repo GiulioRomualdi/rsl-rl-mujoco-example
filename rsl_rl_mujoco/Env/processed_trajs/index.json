@@ -1,0 +1,1122 @@
+[
+  {
+    "file": "SUBJECT01_steps_seg000.npz",
+    "frames": 2840
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg000.npz",
+    "frames": 2840
+  },
+  {
+    "file": "SUBJECT01_steps_seg001.npz",
+    "frames": 3270
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg001.npz",
+    "frames": 3270
+  },
+  {
+    "file": "SUBJECT01_steps_seg002.npz",
+    "frames": 3800
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg002.npz",
+    "frames": 3800
+  },
+  {
+    "file": "SUBJECT01_steps_seg003.npz",
+    "frames": 3660
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg003.npz",
+    "frames": 3660
+  },
+  {
+    "file": "SUBJECT01_steps_seg004.npz",
+    "frames": 1860
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg004.npz",
+    "frames": 1860
+  },
+  {
+    "file": "SUBJECT01_steps_seg005.npz",
+    "frames": 2760
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg005.npz",
+    "frames": 2760
+  },
+  {
+    "file": "SUBJECT01_steps_seg006.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg006.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT01_steps_seg007.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg007.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT01_steps_seg008.npz",
+    "frames": 1150
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg008.npz",
+    "frames": 1150
+  },
+  {
+    "file": "SUBJECT01_steps_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT01_steps_seg010.npz",
+    "frames": 1040
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg010.npz",
+    "frames": 1040
+  },
+  {
+    "file": "SUBJECT01_steps_seg011.npz",
+    "frames": 840
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg011.npz",
+    "frames": 840
+  },
+  {
+    "file": "SUBJECT01_steps_seg012.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg012.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT01_steps_seg013.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT01_steps_mirror_seg013.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT02_steps_seg000.npz",
+    "frames": 2970
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg000.npz",
+    "frames": 2970
+  },
+  {
+    "file": "SUBJECT02_steps_seg001.npz",
+    "frames": 2880
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg001.npz",
+    "frames": 2880
+  },
+  {
+    "file": "SUBJECT02_steps_seg002.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg002.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT02_steps_seg003.npz",
+    "frames": 1320
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg003.npz",
+    "frames": 1320
+  },
+  {
+    "file": "SUBJECT02_steps_seg004.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg004.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT02_steps_seg005.npz",
+    "frames": 1160
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg005.npz",
+    "frames": 1160
+  },
+  {
+    "file": "SUBJECT02_steps_seg006.npz",
+    "frames": 1120
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg006.npz",
+    "frames": 1120
+  },
+  {
+    "file": "SUBJECT02_steps_seg007.npz",
+    "frames": 830
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg007.npz",
+    "frames": 830
+  },
+  {
+    "file": "SUBJECT02_steps_seg008.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg008.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT02_steps_seg009.npz",
+    "frames": 860
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg009.npz",
+    "frames": 860
+  },
+  {
+    "file": "SUBJECT02_steps_seg010.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg010.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT02_steps_seg011.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT02_steps_mirror_seg011.npz",
+    "frames": 850
+  },
+  {
+    "file": "SUBJECT03_steps_seg000.npz",
+    "frames": 3040
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg000.npz",
+    "frames": 3040
+  },
+  {
+    "file": "SUBJECT03_steps_seg001.npz",
+    "frames": 3140
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg001.npz",
+    "frames": 3140
+  },
+  {
+    "file": "SUBJECT03_steps_seg002.npz",
+    "frames": 3180
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg002.npz",
+    "frames": 3180
+  },
+  {
+    "file": "SUBJECT03_steps_seg003.npz",
+    "frames": 1860
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg003.npz",
+    "frames": 1860
+  },
+  {
+    "file": "SUBJECT03_steps_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT03_steps_seg005.npz",
+    "frames": 1780
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg005.npz",
+    "frames": 1780
+  },
+  {
+    "file": "SUBJECT03_steps_seg006.npz",
+    "frames": 1300
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg006.npz",
+    "frames": 1300
+  },
+  {
+    "file": "SUBJECT03_steps_seg007.npz",
+    "frames": 1250
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg007.npz",
+    "frames": 1250
+  },
+  {
+    "file": "SUBJECT03_steps_seg008.npz",
+    "frames": 1300
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg008.npz",
+    "frames": 1300
+  },
+  {
+    "file": "SUBJECT03_steps_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT03_steps_seg010.npz",
+    "frames": 1130
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg010.npz",
+    "frames": 1130
+  },
+  {
+    "file": "SUBJECT03_steps_seg011.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg011.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_seg012.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg012.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_seg013.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg013.npz",
+    "frames": 900
+  },
+  {
+    "file": "SUBJECT03_steps_seg014.npz",
+    "frames": 870
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg014.npz",
+    "frames": 870
+  },
+  {
+    "file": "SUBJECT03_steps_seg015.npz",
+    "frames": 860
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg015.npz",
+    "frames": 860
+  },
+  {
+    "file": "SUBJECT03_steps_seg016.npz",
+    "frames": 820
+  },
+  {
+    "file": "SUBJECT03_steps_mirror_seg016.npz",
+    "frames": 820
+  },
+  {
+    "file": "SUBJECT04_steps_seg000.npz",
+    "frames": 2800
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg000.npz",
+    "frames": 2800
+  },
+  {
+    "file": "SUBJECT04_steps_seg001.npz",
+    "frames": 2700
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg001.npz",
+    "frames": 2700
+  },
+  {
+    "file": "SUBJECT04_steps_seg002.npz",
+    "frames": 1660
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg002.npz",
+    "frames": 1660
+  },
+  {
+    "file": "SUBJECT04_steps_seg003.npz",
+    "frames": 1660
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg003.npz",
+    "frames": 1660
+  },
+  {
+    "file": "SUBJECT04_steps_seg004.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg004.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT04_steps_seg005.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg005.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT04_steps_seg006.npz",
+    "frames": 1180
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg006.npz",
+    "frames": 1180
+  },
+  {
+    "file": "SUBJECT04_steps_seg007.npz",
+    "frames": 1210
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg007.npz",
+    "frames": 1210
+  },
+  {
+    "file": "SUBJECT04_steps_seg008.npz",
+    "frames": 960
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg008.npz",
+    "frames": 960
+  },
+  {
+    "file": "SUBJECT04_steps_seg009.npz",
+    "frames": 1050
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg009.npz",
+    "frames": 1050
+  },
+  {
+    "file": "SUBJECT04_steps_seg010.npz",
+    "frames": 1000
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg010.npz",
+    "frames": 1000
+  },
+  {
+    "file": "SUBJECT04_steps_seg011.npz",
+    "frames": 890
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg011.npz",
+    "frames": 890
+  },
+  {
+    "file": "SUBJECT04_steps_seg012.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT04_steps_mirror_seg012.npz",
+    "frames": 880
+  },
+  {
+    "file": "SUBJECT05_steps_seg000.npz",
+    "frames": 3270
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg000.npz",
+    "frames": 3270
+  },
+  {
+    "file": "SUBJECT05_steps_seg001.npz",
+    "frames": 3280
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg001.npz",
+    "frames": 3280
+  },
+  {
+    "file": "SUBJECT05_steps_seg002.npz",
+    "frames": 3070
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg002.npz",
+    "frames": 3070
+  },
+  {
+    "file": "SUBJECT05_steps_seg003.npz",
+    "frames": 1600
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg003.npz",
+    "frames": 1600
+  },
+  {
+    "file": "SUBJECT05_steps_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT05_steps_seg005.npz",
+    "frames": 1700
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg005.npz",
+    "frames": 1700
+  },
+  {
+    "file": "SUBJECT05_steps_seg006.npz",
+    "frames": 1700
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg006.npz",
+    "frames": 1700
+  },
+  {
+    "file": "SUBJECT05_steps_seg007.npz",
+    "frames": 1600
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg007.npz",
+    "frames": 1600
+  },
+  {
+    "file": "SUBJECT05_steps_seg008.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg008.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT05_steps_seg009.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg009.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_seg010.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg010.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT05_steps_seg011.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg011.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT05_steps_seg012.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg012.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_seg013.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg013.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT05_steps_seg014.npz",
+    "frames": 1290
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg014.npz",
+    "frames": 1290
+  },
+  {
+    "file": "SUBJECT05_steps_seg015.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg015.npz",
+    "frames": 1220
+  },
+  {
+    "file": "SUBJECT05_steps_seg016.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg016.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT05_steps_seg017.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg017.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT05_steps_seg018.npz",
+    "frames": 1040
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg018.npz",
+    "frames": 1040
+  },
+  {
+    "file": "SUBJECT05_steps_seg019.npz",
+    "frames": 1110
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg019.npz",
+    "frames": 1110
+  },
+  {
+    "file": "SUBJECT05_steps_seg020.npz",
+    "frames": 1020
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg020.npz",
+    "frames": 1020
+  },
+  {
+    "file": "SUBJECT05_steps_seg021.npz",
+    "frames": 1030
+  },
+  {
+    "file": "SUBJECT05_steps_mirror_seg021.npz",
+    "frames": 1030
+  },
+  {
+    "file": "SUBJECT06_steps_seg000.npz",
+    "frames": 1850
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg000.npz",
+    "frames": 1850
+  },
+  {
+    "file": "SUBJECT06_steps_seg001.npz",
+    "frames": 1710
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg001.npz",
+    "frames": 1710
+  },
+  {
+    "file": "SUBJECT06_steps_seg002.npz",
+    "frames": 1920
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg002.npz",
+    "frames": 1920
+  },
+  {
+    "file": "SUBJECT06_steps_seg003.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg003.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT06_steps_seg004.npz",
+    "frames": 1310
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg004.npz",
+    "frames": 1310
+  },
+  {
+    "file": "SUBJECT06_steps_seg005.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg005.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT06_steps_seg006.npz",
+    "frames": 1140
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg006.npz",
+    "frames": 1140
+  },
+  {
+    "file": "SUBJECT06_steps_seg007.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg007.npz",
+    "frames": 1200
+  },
+  {
+    "file": "SUBJECT06_steps_seg008.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg008.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT06_steps_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT06_steps_mirror_seg009.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT07_steps_seg000.npz",
+    "frames": 2860
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg000.npz",
+    "frames": 2860
+  },
+  {
+    "file": "SUBJECT07_steps_seg001.npz",
+    "frames": 2660
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg001.npz",
+    "frames": 2660
+  },
+  {
+    "file": "SUBJECT07_steps_seg002.npz",
+    "frames": 1740
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg002.npz",
+    "frames": 1740
+  },
+  {
+    "file": "SUBJECT07_steps_seg003.npz",
+    "frames": 1720
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg003.npz",
+    "frames": 1720
+  },
+  {
+    "file": "SUBJECT07_steps_seg004.npz",
+    "frames": 1730
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg004.npz",
+    "frames": 1730
+  },
+  {
+    "file": "SUBJECT07_steps_seg005.npz",
+    "frames": 1270
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg005.npz",
+    "frames": 1270
+  },
+  {
+    "file": "SUBJECT07_steps_seg006.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg006.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_seg007.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg007.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT07_steps_seg008.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg008.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_seg009.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg009.npz",
+    "frames": 1260
+  },
+  {
+    "file": "SUBJECT07_steps_seg010.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT07_steps_mirror_seg010.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT08_steps_seg000.npz",
+    "frames": 3170
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg000.npz",
+    "frames": 3170
+  },
+  {
+    "file": "SUBJECT08_steps_seg001.npz",
+    "frames": 2980
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg001.npz",
+    "frames": 2980
+  },
+  {
+    "file": "SUBJECT08_steps_seg002.npz",
+    "frames": 3180
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg002.npz",
+    "frames": 3180
+  },
+  {
+    "file": "SUBJECT08_steps_seg003.npz",
+    "frames": 3000
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg003.npz",
+    "frames": 3000
+  },
+  {
+    "file": "SUBJECT08_steps_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT08_steps_seg005.npz",
+    "frames": 1760
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg005.npz",
+    "frames": 1760
+  },
+  {
+    "file": "SUBJECT08_steps_seg006.npz",
+    "frames": 1730
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg006.npz",
+    "frames": 1730
+  },
+  {
+    "file": "SUBJECT08_steps_seg007.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg007.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT08_steps_seg008.npz",
+    "frames": 1350
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg008.npz",
+    "frames": 1350
+  },
+  {
+    "file": "SUBJECT08_steps_seg009.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg009.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT08_steps_seg010.npz",
+    "frames": 1110
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg010.npz",
+    "frames": 1110
+  },
+  {
+    "file": "SUBJECT08_steps_seg011.npz",
+    "frames": 1120
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg011.npz",
+    "frames": 1120
+  },
+  {
+    "file": "SUBJECT08_steps_seg012.npz",
+    "frames": 1100
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg012.npz",
+    "frames": 1100
+  },
+  {
+    "file": "SUBJECT08_steps_seg013.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg013.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT08_steps_seg014.npz",
+    "frames": 1030
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg014.npz",
+    "frames": 1030
+  },
+  {
+    "file": "SUBJECT08_steps_seg015.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT08_steps_mirror_seg015.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT09_steps_seg000.npz",
+    "frames": 2980
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg000.npz",
+    "frames": 2980
+  },
+  {
+    "file": "SUBJECT09_steps_seg001.npz",
+    "frames": 3000
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg001.npz",
+    "frames": 3000
+  },
+  {
+    "file": "SUBJECT09_steps_seg002.npz",
+    "frames": 3030
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg002.npz",
+    "frames": 3030
+  },
+  {
+    "file": "SUBJECT09_steps_seg003.npz",
+    "frames": 2920
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg003.npz",
+    "frames": 2920
+  },
+  {
+    "file": "SUBJECT09_steps_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg004.npz",
+    "frames": 1800
+  },
+  {
+    "file": "SUBJECT09_steps_seg005.npz",
+    "frames": 1470
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg005.npz",
+    "frames": 1470
+  },
+  {
+    "file": "SUBJECT09_steps_seg006.npz",
+    "frames": 1430
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg006.npz",
+    "frames": 1430
+  },
+  {
+    "file": "SUBJECT09_steps_seg007.npz",
+    "frames": 1460
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg007.npz",
+    "frames": 1460
+  },
+  {
+    "file": "SUBJECT09_steps_seg008.npz",
+    "frames": 1440
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg008.npz",
+    "frames": 1440
+  },
+  {
+    "file": "SUBJECT09_steps_seg009.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg009.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT09_steps_seg010.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg010.npz",
+    "frames": 1360
+  },
+  {
+    "file": "SUBJECT09_steps_seg011.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg011.npz",
+    "frames": 1330
+  },
+  {
+    "file": "SUBJECT09_steps_seg012.npz",
+    "frames": 1150
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg012.npz",
+    "frames": 1150
+  },
+  {
+    "file": "SUBJECT09_steps_seg013.npz",
+    "frames": 1130
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg013.npz",
+    "frames": 1130
+  },
+  {
+    "file": "SUBJECT09_steps_seg014.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg014.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT09_steps_seg015.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT09_steps_mirror_seg015.npz",
+    "frames": 1080
+  },
+  {
+    "file": "SUBJECT11_steps_seg000.npz",
+    "frames": 2720
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg000.npz",
+    "frames": 2720
+  },
+  {
+    "file": "SUBJECT11_steps_seg001.npz",
+    "frames": 2850
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg001.npz",
+    "frames": 2850
+  },
+  {
+    "file": "SUBJECT11_steps_seg002.npz",
+    "frames": 2820
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg002.npz",
+    "frames": 2820
+  },
+  {
+    "file": "SUBJECT11_steps_seg003.npz",
+    "frames": 1850
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg003.npz",
+    "frames": 1850
+  },
+  {
+    "file": "SUBJECT11_steps_seg004.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg004.npz",
+    "frames": 1240
+  },
+  {
+    "file": "SUBJECT11_steps_seg005.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg005.npz",
+    "frames": 1280
+  },
+  {
+    "file": "SUBJECT11_steps_seg006.npz",
+    "frames": 1140
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg006.npz",
+    "frames": 1140
+  },
+  {
+    "file": "SUBJECT11_steps_seg007.npz",
+    "frames": 1020
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg007.npz",
+    "frames": 1020
+  },
+  {
+    "file": "SUBJECT11_steps_seg008.npz",
+    "frames": 1060
+  },
+  {
+    "file": "SUBJECT11_steps_mirror_seg008.npz",
+    "frames": 1060
+  }
+]
